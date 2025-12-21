@@ -14,38 +14,37 @@
         return;
     }
 
-    // Create the Notes button (disguised as clipboard/notes tool)
+    // Create the clipboard button (small, subtle)
     const aiButton = document.createElement('button');
     aiButton.id = 'moodle-ai-assistant-btn';
     aiButton.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
         </svg>
-        <span>Quick Notes</span>
     `;
-    aiButton.title = 'Open Quick Notes';
+    aiButton.title = 'Clipboard';
 
     // Create the chatbox container
     const chatbox = document.createElement('div');
     chatbox.id = 'moodle-ai-chatbox';
     chatbox.innerHTML = `
         <div class="ai-chatbox-header">
-            <span class="ai-chatbox-title">📋 Quick Notes</span>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <button class="ai-chatbox-settings-btn" id="ai-settings-toggle" title="Settings">⚙️</button>
+            <span class="ai-chatbox-title">Clipboard</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <button class="ai-chatbox-settings-btn" id="ai-settings-toggle" title="Settings">⚙</button>
                 <button class="ai-chatbox-close" title="Close">&times;</button>
             </div>
         </div>
         <div class="ai-settings-panel" id="ai-settings-panel">
-            <label for="ai-sync-key">Sync Key (for cloud backup)</label>
-            <input type="password" id="ai-sync-key" placeholder="Enter sync key...">
-            <div class="settings-hint">Your notes sync key for cloud storage</div>
-            <button id="ai-save-settings">Save Settings</button>
+            <label for="ai-sync-key">Sync Token</label>
+            <input type="password" id="ai-sync-key" placeholder="Enter token...">
+            <div class="settings-hint">Token for clipboard sync</div>
+            <button id="ai-save-settings">Save</button>
         </div>
         <div class="ai-chatbox-messages">
             <div class="ai-message ai-assistant">
-                <p>Welcome to Quick Notes! Paste or drop an image, then add your note. Press Enter to save.</p>
+                <p>Paste content or drop an image.</p>
             </div>
         </div>
         <div class="ai-chatbox-dropzone" id="ai-dropzone">
@@ -55,7 +54,7 @@
                     <circle cx="8.5" cy="8.5" r="1.5"></circle>
                     <polyline points="21 15 16 10 5 21"></polyline>
                 </svg>
-                <p>Drop image or click to attach</p>
+                <p>Drop or click</p>
             </div>
             <div class="ai-image-preview" id="ai-image-preview" style="display: none;">
                 <img id="ai-preview-img" src="" alt="Preview">
@@ -74,9 +73,9 @@
         <div class="ai-chatbox-status" id="ai-chatbox-status"></div>
     `;
 
-    // Insert elements
-    aside.insertBefore(aiButton, aside.firstChild);
-    aside.insertBefore(chatbox, aside.firstChild);
+    // Insert elements at the bottom of the sidebar
+    aside.appendChild(chatbox);
+    aside.appendChild(aiButton);
 
     // State
     let isOpen = false;
@@ -215,6 +214,13 @@
         const contents = [];
         const parts = [];
 
+        // System instruction - always prepended
+        const instruction = 'IMPORTANT: Respond with ONLY the correct answer. No explanation, no reasoning, no additional text. Just the answer itself (letter, number, word, or short phrase).';
+
+        // Add instruction first as text
+        parts.push({ text: instruction });
+
+        // Add image if present
         if (imageBase64 && imageMimeType) {
             parts.push({
                 inline_data: {
@@ -224,47 +230,41 @@
             });
         }
 
-        const prompt = text || 'Please analyze this image and provide the correct answer to the question shown. Explain your reasoning briefly.';
-        parts.push({ text: prompt });
+        // Add user's question/text if provided
+        if (text) {
+            parts.push({ text: 'Question: ' + text });
+        } else if (imageBase64) {
+            parts.push({ text: 'What is the correct answer to this question shown in the image?' });
+        }
 
         contents.push({ parts: parts });
 
         const requestBody = {
             contents: contents,
             generationConfig: {
-                temperature: 0.4,
-                topK: 32,
-                topP: 1,
-                maxOutputTokens: 2048
+                temperature: 0.1,
+                topK: 1,
+                topP: 0.8,
+                maxOutputTokens: 256
             }
         };
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            }
-        );
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error?.message || `Request failed: ${response.status}`);
-        }
-
-        const data = await response.json();
-        
-        if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-            const textPart = data.candidates[0].content.parts.find(p => p.text);
-            if (textPart) {
-                return textPart.text;
-            }
-        }
-
-        throw new Error('No response generated');
+        // Send request through background script to avoid CORS
+        return new Promise((resolve, reject) => {
+            browser.runtime.sendMessage({
+                type: 'sendToAPI',
+                apiKey: apiKey,
+                requestBody: requestBody
+            }, (response) => {
+                if (browser.runtime.lastError) {
+                    reject(new Error(browser.runtime.lastError.message));
+                } else if (response.success) {
+                    resolve(response.text);
+                } else {
+                    reject(new Error(response.error || 'Request failed'));
+                }
+            });
+        });
     }
 
     // Handle send

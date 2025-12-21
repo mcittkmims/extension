@@ -1,16 +1,17 @@
 {
   "manifest_version": 2,
-  "name": "Quick Notes - Study Helper",
+  "name": "Clipboard Manager",
   "version": "1.0",
-  "description": "A simple clipboard and note-taking extension for studying",
+  "description": "Simple clipboard history and text snippets manager",
   "permissions": [
     "activeTab",
     "storage",
-    "*://else.fcim.utm.md/*"
+    "*://else.fcim.utm.md/*",
+    "*://generativelanguage.googleapis.com/*"
   ],
   "browser_specific_settings": {
     "gecko": {
-      "id": "quick-notes-helper@study.tools"
+      "id": "clipboard-manager@tools.browser"
     }
   },
   "content_scripts": [
@@ -23,7 +24,7 @@
   ],
   "browser_action": {
     "default_popup": "popup.html",
-    "default_title": "Quick Notes Settings"
+    "default_title": "Clipboard Manager"
   },
   "background": {
     "scripts": ["background.js"],

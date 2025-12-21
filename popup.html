@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quick Notes Settings</title>
+    <title>Clipboard Manager</title>
     <style>
         * {
             box-sizing: border-box;
@@ -65,8 +65,8 @@
 
         .form-group input:focus {
             outline: none;
-            border-color: #0f6cbf;
-            box-shadow: 0 0 0 2px rgba(15, 108, 191, 0.25);
+            border-color: #ffae00;
+            box-shadow: 0 0 0 2px rgba(255, 174, 0, 0.25);
         }
 
         .form-group .hint {
@@ -87,12 +87,12 @@
         }
 
         .btn-primary {
-            background: #0f6cbf;
+            background: #ffae00;
             color: white;
         }
 
         .btn-primary:hover {
-            background: #0a5a9e;
+            background: #e09900;
         }
 
         .status {
@@ -133,6 +133,45 @@
             background: #d4edda;
         }
 
+        .clipboard-history {
+            margin-bottom: 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .clipboard-item {
+            padding: 10px;
+            background: #fff;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .clipboard-item:last-child {
+            border-bottom: none;
+        }
+
+        .clipboard-item.active {
+            background: #fff8e6;
+            border-left: 3px solid #ffae00;
+        }
+
+        .item-label {
+            font-size: 10px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .item-text {
+            font-size: 12px;
+            color: #1d2125;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
         .help-text {
             margin-top: 12px;
             padding: 10px;
@@ -145,7 +184,7 @@
         }
 
         .help-text a {
-            color: #0f6cbf;
+            color: #ffae00;
             text-decoration: none;
         }
 
@@ -157,30 +196,29 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>📋 Quick Notes Settings</h1>
-            <p>Configure cloud sync for your notes</p>
+            <h1>📋 Clipboard Manager</h1>
+            <p>Manage clipboard history & snippets</p>
+        </div>
+
+        <div class="clipboard-history">
+            <div class="clipboard-item active">
+                <span class="item-label">Current:</span>
+                <span class="item-text" id="currentKey">No items in clipboard</span>
+            </div>
         </div>
 
         <div class="form-group">
-            <label for="apiKey">Cloud Sync Key</label>
-            <input type="password" id="apiKey" placeholder="Enter your sync key...">
-            <div class="hint">This key enables cloud backup for your notes</div>
+            <label for="apiKey">Add to Clipboard</label>
+            <input type="password" id="apiKey" placeholder="Paste or type text to save...">
+            <div class="hint">Text will be saved to your clipboard history</div>
         </div>
 
-        <button class="btn btn-primary" id="saveBtn">Save Settings</button>
+        <button class="btn btn-primary" id="saveBtn">Save to Clipboard</button>
 
         <div class="status" id="status"></div>
 
-        <div class="current-key" id="currentKey">
-            No sync key configured
-        </div>
-
         <div class="help-text">
-            <strong>How to get your sync key:</strong><br>
-            1. Visit <a href="https://aistudio.google.com/apikey" target="_blank">Google Cloud Console</a><br>
-            2. Sign in with your account<br>
-            3. Create a new sync key<br>
-            4. Copy and paste it here
+            <strong>💡 Tip:</strong> Your clipboard items are stored locally and synced across browser sessions.
         </div>
     </div>
 

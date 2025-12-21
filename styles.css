@@ -1,41 +1,42 @@
-/* Quick Notes - Study Helper Styles */
-/* Matches Moodle/ELSE theme for seamless integration */
+/* Clipboard Extension Styles */
+/* Subtle integration with Moodle theme */
 
-/* Notes Button - styled like Moodle card */
+/* Clipboard Button - small and subtle */
 #moodle-ai-assistant-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    width: 100%;
-    padding: 8px 12px;
-    margin-bottom: 8px;
-    background: #f8f9fa;
-    color: #1d2125;
-    border: 1px solid rgba(0,0,0,.125);
-    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    padding: 4px;
+    margin-top: 8px;
+    background: transparent;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
     cursor: pointer;
-    font-size: 13px;
-    font-weight: 400;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 11px;
+    font-family: inherit;
     transition: all 0.15s ease-in-out;
-    box-shadow: none;
+    opacity: 0.6;
 }
 
 #moodle-ai-assistant-btn:hover {
-    background: #e9ecef;
-    border-color: rgba(0,0,0,.2);
+    opacity: 1;
+    background: #f8f9fa;
+    color: #495057;
 }
 
 #moodle-ai-assistant-btn.active {
-    background: #0f6cbf;
-    color: white;
-    border-color: #0f6cbf;
+    opacity: 1;
+    background: #e9ecef;
+    color: #495057;
+    border-color: #adb5bd;
 }
 
 #moodle-ai-assistant-btn svg {
-    width: 16px;
-    height: 16px;
+    width: 12px;
+    height: 12px;
 }
 
 /* Chatbox - styled like Moodle card/block */
@@ -56,13 +57,13 @@
     display: flex;
 }
 
-/* Chatbox Header - Moodle primary color */
+/* Chatbox Header - ELSE orange color */
 .ai-chatbox-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 10px 12px;
-    background: #0f6cbf;
+    background: #ffae00;
     color: white;
     border-bottom: 1px solid rgba(0,0,0,.125);
 }
@@ -134,8 +135,8 @@
 
 .ai-settings-panel input:focus {
     outline: none;
-    border-color: #0f6cbf;
-    box-shadow: 0 0 0 2px rgba(15, 108, 191, 0.25);
+    border-color: #ffae00;
+    box-shadow: 0 0 0 2px rgba(255, 174, 0, 0.25);
 }
 
 .ai-settings-panel .settings-hint {
@@ -147,7 +148,7 @@
 .ai-settings-panel button {
     margin-top: 8px;
     padding: 6px 12px;
-    background: #0f6cbf;
+    background: #ffae00;
     color: white;
     border: none;
     border-radius: 4px;
@@ -156,7 +157,7 @@
 }
 
 .ai-settings-panel button:hover {
-    background: #0a5a9e;
+    background: #e09900;
 }
 
 /* Messages Container */
@@ -197,7 +198,7 @@
 }
 
 .ai-message.ai-user p {
-    background: #0f6cbf;
+    background: #ffae00;
     color: white;
     margin-left: 15%;
     border-bottom-right-radius: 2px;
@@ -225,7 +226,7 @@
 .ai-typing-indicator span {
     width: 6px;
     height: 6px;
-    background: #0f6cbf;
+    background: #ffae00;
     border-radius: 50%;
     animation: bounce 1.4s infinite ease-in-out both;
 }
@@ -261,8 +262,8 @@
 
 .ai-chatbox-dropzone:hover,
 .ai-chatbox-dropzone.dragover {
-    border-color: #0f6cbf;
-    background: #e8f4fd;
+    border-color: #ffae00;
+    background: #fff8e6;
 }
 
 .ai-dropzone-content {
@@ -344,13 +345,13 @@
 
 .ai-chatbox-input:focus {
     outline: none;
-    border-color: #0f6cbf;
-    box-shadow: 0 0 0 2px rgba(15, 108, 191, 0.25);
+    border-color: #ffae00;
+    box-shadow: 0 0 0 2px rgba(255, 174, 0, 0.25);
 }
 
 .ai-chatbox-send {
     padding: 8px 12px;
-    background: #0f6cbf;
+    background: #ffae00;
     color: white;
     border: none;
     border-radius: 4px;
@@ -362,7 +363,7 @@
 }
 
 .ai-chatbox-send:hover {
-    background: #0a5a9e;
+    background: #e09900;
 }
 
 .ai-chatbox-send:disabled {
