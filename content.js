@@ -37,12 +37,22 @@
                 <option value="anthropic">Anthropic (Claude)</option>
                 <option value="openrouter">OpenRouter</option>
                 <option value="grok">Grok (xAI)</option>
+                <option value="opencode">OpenCode (local)</option>
             </select>
             <label for="ai-model-select" style="margin-top:8px">Model</label>
             <select id="ai-model-select" class="ai-settings-select"></select>
-            <label for="ai-sync-key" style="margin-top:8px">API Key</label>
-            <input type="password" id="ai-sync-key" placeholder="Enter API key...">
-            <div class="settings-hint">Key for the selected AI provider</div>
+            <div id="ai-api-key-group">
+                <label for="ai-sync-key" style="margin-top:8px">API Key</label>
+                <input type="password" id="ai-sync-key" placeholder="Enter API key...">
+                <div class="settings-hint">Key for the selected AI provider</div>
+            </div>
+            <div id="ai-opencode-group" style="display:none; margin-top:8px;">
+                <label for="ai-opencode-url">OpenCode Server URL</label>
+                <input type="text" id="ai-opencode-url" placeholder="http://127.0.0.1:4096">
+                <label for="ai-opencode-password" style="margin-top:8px">Server Password (optional)</label>
+                <input type="password" id="ai-opencode-password" placeholder="OPENCODE_SERVER_PASSWORD">
+                <div class="settings-hint" id="ai-opencode-status">Models load from your OpenCode server.</div>
+            </div>
             <label for="ai-opacity-slider" style="margin-top:8px">Chat Opacity</label>
             <div style="display:flex;align-items:center;gap:8px">
                 <input type="range" id="ai-opacity-slider" min="10" max="100" step="5" value="95" style="flex:1">
@@ -227,6 +237,8 @@
     let currentImageMimeType = null;
     let currentProvider = 'gemini';
     let _settingsMinH = 354; // measured once at init
+    const OPENCODE_DEFAULT_URL = 'http://127.0.0.1:4096';
+    let opencodeModelCache = { key: '', models: [] };
 
     // Available models per provider
     const PROVIDER_MODELS = {
@@ -267,11 +279,9 @@
         ],
     };
 
-    // Populate model dropdown for given provider, optionally pre-selecting savedModel
-    function populateModels(provider, savedModel) {
+    function setModelOptions(models, savedModel) {
         const modelSelect = document.getElementById('ai-model-select');
         modelSelect.innerHTML = '';
-        const models = PROVIDER_MODELS[provider] || [];
         models.forEach(m => {
             const opt = document.createElement('option');
             opt.value = m.value;
@@ -280,6 +290,87 @@
         });
         if (savedModel && models.some(m => m.value === savedModel)) {
             modelSelect.value = savedModel;
+        } else if (models.length > 0) {
+            modelSelect.value = models[0].value;
+        }
+    }
+
+    function normalizeOpenCodeUrl(url) {
+        const raw = (url || '').trim();
+        if (!raw) return OPENCODE_DEFAULT_URL;
+        return raw.replace(/\/$/, '');
+    }
+
+    function getPageSessionKey() {
+        return `${window.location.origin}${window.location.pathname}${window.location.search}`;
+    }
+
+    function updateProviderSettingsUI(provider) {
+        const isOpenCode = provider === 'opencode';
+        document.getElementById('ai-api-key-group').style.display = isOpenCode ? 'none' : 'block';
+        document.getElementById('ai-opencode-group').style.display = isOpenCode ? 'block' : 'none';
+    }
+
+    function fetchOpenCodeModels(opencodeConfig) {
+        return new Promise((resolve, reject) => {
+            browser.runtime.sendMessage({
+                type: 'getOpenCodeModels',
+                opencodeConfig
+            }, (response) => {
+                if (browser.runtime.lastError) {
+                    reject(new Error(browser.runtime.lastError.message));
+                    return;
+                }
+                if (!response || !response.success) {
+                    reject(new Error(response && response.error ? response.error : 'Failed to load models'));
+                    return;
+                }
+                resolve(response);
+            });
+        });
+    }
+
+    // Populate model dropdown for given provider, optionally pre-selecting savedModel
+    async function populateModels(provider, savedModel, settings) {
+        if (provider !== 'opencode') {
+            setModelOptions(PROVIDER_MODELS[provider] || [], savedModel);
+            return;
+        }
+
+        const modelSelect = document.getElementById('ai-model-select');
+        const status = document.getElementById('ai-opencode-status');
+        modelSelect.innerHTML = '';
+        const loading = document.createElement('option');
+        loading.value = '';
+        loading.textContent = 'Loading models...';
+        modelSelect.appendChild(loading);
+
+        const conf = settings || await getApiKey();
+        const opencodeConfig = {
+            baseUrl: normalizeOpenCodeUrl(conf.opencodeUrl),
+            password: conf.opencodePassword || ''
+        };
+        const cacheKey = `${opencodeConfig.baseUrl}::${opencodeConfig.password}`;
+
+        try {
+            let serverModels = [];
+            let defaultModel = '';
+
+            if (opencodeModelCache.key === cacheKey && opencodeModelCache.models.length > 0) {
+                serverModels = opencodeModelCache.models;
+            } else {
+                const data = await fetchOpenCodeModels(opencodeConfig);
+                serverModels = Array.isArray(data.models) ? data.models : [];
+                defaultModel = data.defaultModel || '';
+                opencodeModelCache = { key: cacheKey, models: serverModels };
+            }
+
+            const merged = [{ value: '', label: 'Server default model' }].concat(serverModels);
+            setModelOptions(merged, savedModel || defaultModel || '');
+            status.textContent = `Connected to ${opencodeConfig.baseUrl}`;
+        } catch (error) {
+            setModelOptions([{ value: '', label: 'Server default model' }], '');
+            status.textContent = `Model fetch failed: ${error.message}`;
         }
     }
 
@@ -492,11 +583,23 @@
     // Get API key, provider and model from storage
     async function getApiKey() {
         return new Promise((resolve) => {
-            browser.storage.local.get(['geminiApiKey', 'apiProvider', 'apiModel', 'chatOpacity', 'btnOpacity', 'chatWidth', 'chatHeight'], (result) => {
+            browser.storage.local.get([
+                'geminiApiKey',
+                'apiProvider',
+                'apiModel',
+                'opencodeServerUrl',
+                'opencodePassword',
+                'chatOpacity',
+                'btnOpacity',
+                'chatWidth',
+                'chatHeight'
+            ], (result) => {
                 resolve({
                     key: result.geminiApiKey || null,
                     provider: result.apiProvider || 'gemini',
                     model: result.apiModel || null,
+                    opencodeUrl: result.opencodeServerUrl || OPENCODE_DEFAULT_URL,
+                    opencodePassword: result.opencodePassword || '',
                     opacity: result.chatOpacity != null ? result.chatOpacity : 0.95,
                     btnOpacity: result.btnOpacity != null ? result.btnOpacity : 0.25,
                     chatWidth: result.chatWidth != null ? result.chatWidth : 320,
@@ -507,9 +610,19 @@
     }
 
     // Save API key, provider and model
-    async function saveApiKey(key, provider, model, opacity, btnOp, chatWidth, chatHeight) {
+    async function saveApiKey(key, provider, model, opencodeUrl, opencodePassword, opacity, btnOp, chatWidth, chatHeight) {
         return new Promise((resolve) => {
-            browser.storage.local.set({ geminiApiKey: key, apiProvider: provider, apiModel: model, chatOpacity: opacity, btnOpacity: btnOp, chatWidth, chatHeight }, () => {
+            browser.storage.local.set({
+                geminiApiKey: key,
+                apiProvider: provider,
+                apiModel: model,
+                opencodeServerUrl: normalizeOpenCodeUrl(opencodeUrl),
+                opencodePassword: opencodePassword || '',
+                chatOpacity: opacity,
+                btnOpacity: btnOp,
+                chatWidth,
+                chatHeight
+            }, () => {
                 currentProvider = provider;
                 resolve();
             });
@@ -575,6 +688,19 @@
         autoSave();
     });
     // ─────────────────────────────────────────────────────────────────────────
+
+    function imageFilenameForMime(mimeType) {
+        const map = {
+            'image/jpeg': 'image.jpg',
+            'image/png': 'image.png',
+            'image/webp': 'image.webp',
+            'image/gif': 'image.gif',
+            'image/bmp': 'image.bmp',
+            'image/heic': 'image.heic',
+            'image/heif': 'image.heif'
+        };
+        return map[mimeType] || 'image.bin';
+    }
 
     // Build request body based on provider
     function buildRequestBody(provider, model, text, imageBase64, imageMimeType) {
@@ -652,17 +778,50 @@
             };
         }
 
+        if (provider === 'opencode') {
+            const parts = [];
+            if (imageBase64 && imageMimeType) {
+                parts.push({
+                    type: 'file',
+                    mime: imageMimeType,
+                    filename: imageFilenameForMime(imageMimeType),
+                    url: `data:${imageMimeType};base64,${imageBase64}`
+                });
+            }
+            parts.push({ type: 'text', text: userText });
+
+            const body = {
+                system: instruction,
+                parts
+            };
+
+            if (model && model.includes('/')) {
+                const splitIndex = model.indexOf('/');
+                body.model = {
+                    providerID: model.slice(0, splitIndex),
+                    modelID: model.slice(splitIndex + 1)
+                };
+            }
+
+            return body;
+        }
+
         return {};
     }
 
     // Send request to selected AI provider
     async function sendToAI(text, imageBase64 = null, imageMimeType = null) {
-        const { key: apiKey, provider, model } = await getApiKey();
-        if (!apiKey) {
+        const settings = await getApiKey();
+        const { key: apiKey, provider, model } = settings;
+        if (provider !== 'opencode' && !apiKey) {
             throw new Error('API key not configured. Click ⚙️ to set up.');
         }
 
         const requestBody = buildRequestBody(provider, model, text, imageBase64, imageMimeType);
+        const opencodeConfig = {
+            baseUrl: normalizeOpenCodeUrl(settings.opencodeUrl),
+            password: settings.opencodePassword || ''
+        };
 
         // Send request through background script to avoid CORS
         return new Promise((resolve, reject) => {
@@ -670,7 +829,9 @@
                 type: 'sendToAPI',
                 apiKey: apiKey,
                 requestBody: requestBody,
-                provider: provider
+                provider: provider,
+                opencodeConfig,
+                pageKey: getPageSessionKey()
             }, (response) => {
                 if (browser.runtime.lastError) {
                     reject(new Error(browser.runtime.lastError.message));
@@ -716,12 +877,18 @@
 
     // Load saved settings
     async function loadSettings() {
-        const { key, provider, model, opacity, btnOpacity, chatWidth, chatHeight } = await getApiKey();
+        const { key, provider, model, opencodeUrl, opencodePassword, opacity, btnOpacity, chatWidth, chatHeight } = await getApiKey();
         if (key) document.getElementById('ai-sync-key').value = key;
+        document.getElementById('ai-opencode-url').value = normalizeOpenCodeUrl(opencodeUrl);
+        document.getElementById('ai-opencode-password').value = opencodePassword || '';
         const resolvedProvider = provider || 'gemini';
         currentProvider = resolvedProvider;
         document.getElementById('ai-provider-select').value = resolvedProvider;
-        populateModels(resolvedProvider, model);
+        updateProviderSettingsUI(resolvedProvider);
+        await populateModels(resolvedProvider, model, {
+            opencodeUrl: normalizeOpenCodeUrl(opencodeUrl),
+            opencodePassword: opencodePassword || ''
+        });
 
         const pct = Math.round(opacity * 100);
         document.getElementById('ai-opacity-slider').value = pct;
@@ -740,11 +907,13 @@
         const key      = document.getElementById('ai-sync-key').value.trim();
         const provider = document.getElementById('ai-provider-select').value;
         const model    = document.getElementById('ai-model-select').value;
+        const opencodeUrl = normalizeOpenCodeUrl(document.getElementById('ai-opencode-url').value);
+        const opencodePassword = document.getElementById('ai-opencode-password').value;
         const opacity  = parseInt(document.getElementById('ai-opacity-slider').value) / 100;
         const btnOp    = parseInt(document.getElementById('ai-btn-opacity-slider').value) / 100;
         const chatWidth  = chatbox.offsetWidth  || 320;
         const chatHeight = chatbox.offsetHeight || 480;
-        await saveApiKey(key, provider, model, opacity, btnOp, chatWidth, chatHeight);
+        await saveApiKey(key, provider, model, opencodeUrl, opencodePassword, opacity, btnOp, chatWidth, chatHeight);
     }
 
     // Event listeners  (click handled by mouseup drag logic above)
@@ -769,15 +938,38 @@
     document.getElementById('ai-settings-toggle').addEventListener('click', toggleSettings);
 
     // Provider change: repopulate models then auto-save
-    document.getElementById('ai-provider-select').addEventListener('change', () => {
+    document.getElementById('ai-provider-select').addEventListener('change', async () => {
         const provider = document.getElementById('ai-provider-select').value;
-        populateModels(provider, null);
-        autoSave();
+        updateProviderSettingsUI(provider);
+        await populateModels(provider, null);
+        await autoSave();
     });
 
     document.getElementById('ai-model-select').addEventListener('change', () => autoSave());
 
     document.getElementById('ai-sync-key').addEventListener('blur', () => autoSave());
+    document.getElementById('ai-opencode-password').addEventListener('blur', async () => {
+        const settings = {
+            opencodeUrl: normalizeOpenCodeUrl(document.getElementById('ai-opencode-url').value),
+            opencodePassword: document.getElementById('ai-opencode-password').value
+        };
+        await autoSave();
+        opencodeModelCache = { key: '', models: [] };
+        if (document.getElementById('ai-provider-select').value === 'opencode') {
+            await populateModels('opencode', document.getElementById('ai-model-select').value, settings);
+        }
+    });
+    document.getElementById('ai-opencode-url').addEventListener('blur', async () => {
+        const settings = {
+            opencodeUrl: normalizeOpenCodeUrl(document.getElementById('ai-opencode-url').value),
+            opencodePassword: document.getElementById('ai-opencode-password').value
+        };
+        await autoSave();
+        opencodeModelCache = { key: '', models: [] };
+        if (document.getElementById('ai-provider-select').value === 'opencode') {
+            await populateModels('opencode', document.getElementById('ai-model-select').value, settings);
+        }
+    });
 
     document.getElementById('ai-opacity-slider').addEventListener('input', (e) => {
         const pct = parseInt(e.target.value);

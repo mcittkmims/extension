@@ -19,7 +19,9 @@
     "*://api.openai.com/*",
     "*://api.anthropic.com/*",
     "*://openrouter.ai/*",
-    "*://api.x.ai/*"
+    "*://api.x.ai/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
   ],
   "web_accessible_resources": [
     "katex/katex.min.js",

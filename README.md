@@ -35,6 +35,17 @@ Updates are delivered automatically; no reinstall needed for future versions.
 4. Click **✕** next to an item to remove it, or **🗑** in the header to clear everything
 5. Click **🗑** in the header to clear all saved items
 
+
+## Debugging
+
+if clipboard manager refuses to connect, try this to allow CORS
+
+```bash
+opencode serve --hostname 127.0.0.1 --port 4096 --cors moz-extension://<extension-id>
+```
+
+Also, use your real runtime extension ID from Firefox (`browser.runtime.id`), especially for temporary add-ons.
+
 ## File Structure
 
 ```
