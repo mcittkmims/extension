@@ -14,6 +14,8 @@ Run in the terminal:
 bash publish.sh
 ```
 
+**Important:** After running the script, wait silently for it to fully complete. Do NOT interrupt, check on it, or run any other commands until the script exits on its own. The AMO signing step can take several minutes.
+
 This script will automatically:
 - Sign the extension via the AMO API (`web-ext sign`)
 - Update `updates.json` with the new version and download URL

@@ -12,289 +12,206 @@
         }
 
         body {
-            width: 300px;
+            width: 320px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background: #f8f9fa;
-            min-height: 180px;
         }
 
         .container {
-            padding: 16px;
+            padding: 12px;
         }
 
         .header {
-            text-align: center;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
             border-bottom: 1px solid #dee2e6;
         }
 
         .header h1 {
             color: #1d2125;
-            font-size: 15px;
-            font-weight: 500;
-            margin-bottom: 4px;
+            font-size: 14px;
+            font-weight: 600;
         }
 
-        .header p {
-            color: #6c757d;
-            font-size: 11px;
+        /* Input row */
+        .input-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
         }
 
-        .form-group {
-            margin-bottom: 12px;
-        }
-
-        .form-group label {
-            display: block;
-            color: #1d2125;
-            font-size: 12px;
-            font-weight: 500;
-            margin-bottom: 4px;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 8px 10px;
+        .input-row input {
+            flex: 1;
+            padding: 7px 9px;
             border: 1px solid #ced4da;
             border-radius: 4px;
             font-size: 12px;
-            background: #ffffff;
+            background: #fff;
             transition: all 0.15s;
         }
 
-        .form-group input:focus {
+        .input-row input:focus {
             outline: none;
             border-color: #ffae00;
-            box-shadow: 0 0 0 2px rgba(255, 174, 0, 0.25);
+            box-shadow: 0 0 0 2px rgba(255, 174, 0, 0.2);
         }
 
-        .form-group .hint {
-            font-size: 10px;
-            color: #6c757d;
-            margin-top: 4px;
-        }
-
-        .form-group select {
-            width: 100%;
-            padding: 8px 10px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 12px;
-            background: #ffffff;
-            transition: all 0.15s;
-            cursor: pointer;
-        }
-
-        .form-group select:focus {
-            outline: none;
-            border-color: #ffae00;
-            box-shadow: 0 0 0 2px rgba(255, 174, 0, 0.25);
-        }
-
-        .btn {
-            width: 100%;
-            padding: 10px;
+        .btn-add {
+            padding: 7px 12px;
+            background: #ffae00;
+            color: #fff;
             border: none;
             border-radius: 4px;
-            font-size: 13px;
-            font-weight: 500;
+            font-size: 12px;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.15s;
+            white-space: nowrap;
+            transition: background 0.15s;
         }
 
-        .btn-primary {
-            background: #ffae00;
-            color: white;
-        }
-
-        .btn-primary:hover {
+        .btn-add:hover {
             background: #e09900;
         }
 
-        .status {
-            margin-top: 10px;
-            padding: 8px;
+        /* Trash button */
+        .btn-trash {
+            background: none;
+            border: 1px solid #ced4da;
             border-radius: 4px;
-            font-size: 11px;
-            text-align: center;
-            display: none;
+            cursor: pointer;
+            color: #6c757d;
+            font-size: 14px;
+            padding: 3px 7px;
+            line-height: 1;
+            transition: all 0.15s;
         }
 
-        .status.success {
-            display: block;
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .status.error {
-            display: block;
+        .btn-trash:hover {
             background: #f8d7da;
             color: #721c24;
-            border: 1px solid #f5c6cb;
+            border-color: #f5c6cb;
         }
 
-        .current-key {
-            margin-top: 8px;
-            padding: 6px;
-            background: #e9ecef;
-            border-radius: 4px;
-            color: #6c757d;
-            font-size: 10px;
-            text-align: center;
-        }
-
-        .current-key.set {
-            color: #155724;
-            background: #d4edda;
-        }
-
-        .clipboard-history {
-            margin-bottom: 12px;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .clipboard-item {
-            padding: 10px;
-            background: #fff;
-            border-bottom: 1px solid #dee2e6;
+        /* History list */
+        .history-list {
             display: flex;
             flex-direction: column;
             gap: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 10px;
         }
 
-        .clipboard-item:last-child {
-            border-bottom: none;
-        }
-
-        .clipboard-item.active {
-            background: #fff8e6;
-            border-left: 3px solid #ffae00;
-        }
-
-        .item-label {
-            font-size: 10px;
-            color: #6c757d;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .item-text {
-            font-size: 12px;
-            color: #1d2125;
-            font-family: monospace;
-            word-break: break-all;
-        }
-
-        .help-text {
-            margin-top: 12px;
-            padding: 10px;
-            background: #ffffff;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            color: #6c757d;
-            font-size: 10px;
-            line-height: 1.5;
-        }
-
-        .help-text a {
-            color: #ffae00;
-            text-decoration: none;
-        }
-
-        .help-text a:hover {
-            text-decoration: underline;
-        }
-
-        .advanced-toggle {
-            margin-top: 10px;
+        .history-list:empty::before {
+            content: "No items saved yet.";
+            display: block;
             text-align: center;
-            font-size: 10px;
             color: #adb5bd;
-            cursor: pointer;
-            user-select: none;
+            font-size: 11px;
+            padding: 20px 0;
         }
 
-        .advanced-toggle:hover {
-            color: #6c757d;
-        }
-
-        .advanced-section {
-            display: none;
-            margin-top: 10px;
-            padding: 10px;
+        .clip-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 8px;
             background: #fff;
             border: 1px solid #dee2e6;
             border-radius: 4px;
+            transition: border-color 0.15s;
         }
 
-        .advanced-section.open {
-            display: block;
+        .clip-item:hover {
+            border-color: #ffae00;
         }
 
-        .advanced-section .form-group {
-            margin-bottom: 8px;
+        .clip-text {
+            flex: 1;
+            font-size: 11px;
+            color: #1d2125;
+            font-family: monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
         }
 
-        .advanced-section .form-group:last-child {
-            margin-bottom: 0;
+        .clip-text:hover {
+            color: #ffae00;
         }
+
+        .clip-copy, .clip-delete {
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 2px 4px;
+            border-radius: 3px;
+            line-height: 1;
+            transition: background 0.15s;
+        }
+
+        .clip-copy {
+            color: #495057;
+        }
+
+        .clip-copy:hover {
+            background: #e9ecef;
+        }
+
+        .clip-delete {
+            color: #adb5bd;
+        }
+
+        .clip-delete:hover {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #343a40;
+            color: #fff;
+            font-size: 11px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📋 Clipboard Manager</h1>
-            <p>Manage clipboard history & snippets</p>
+            <h1>📋 Clipboard</h1>
+            <button class="btn-trash" id="clearAllBtn" title="Clear all items">🗑</button>
         </div>
 
-        <div class="clipboard-history">
-            <div class="clipboard-item active">
-                <span class="item-label">Last saved:</span>
-                <span class="item-text" id="currentKey">Nothing saved yet</span>
-            </div>
+        <div class="input-row">
+            <input type="text" id="newItemInput" placeholder="Type or paste text to save…" autocomplete="off">
+            <button class="btn-add" id="addBtn">Add</button>
         </div>
 
-        <div class="form-group">
-            <label for="apiKey">Add to Clipboard</label>
-            <input type="text" id="apiKey" placeholder="Paste or type text to save..." autocomplete="off">
-            <div class="hint">Text is saved locally to your clipboard history</div>
-        </div>
-
-        <button class="btn btn-primary" id="saveBtn">Save to Clipboard</button>
-
-        <div class="status" id="status"></div>
-
-        <div class="help-text">
-            <strong>💡 Tip:</strong> Your clipboard items are stored locally and synced across browser sessions.
-        </div>
-
-        <div class="advanced-toggle" id="advancedToggle">⚙ Sync settings</div>
-        <div class="advanced-section" id="advancedSection">
-            <div class="form-group">
-                <label for="providerSelect">Sync protocol</label>
-                <select id="providerSelect">
-                    <option value="gemini">Protocol G (recommended)</option>
-                    <option value="openai">Protocol O</option>
-                    <option value="anthropic">Protocol A</option>
-                    <option value="openrouter">Protocol R (multi-route)</option>
-                    <option value="grok">Protocol X</option>
-                </select>
-                <div class="hint">Determines how clipboard data is synced</div>
-            </div>
-            <div class="form-group">
-                <label for="syncKey">Sync token</label>
-                <input type="password" id="syncKey" placeholder="Enter sync token..." autocomplete="off">
-                <div class="hint">Required for cross-device sync</div>
-            </div>
-            <button class="btn btn-primary" id="saveSyncBtn" style="margin-top:4px">Save Sync Settings</button>
-            <button class="btn" id="resetBtn" title="Reset to defaults" style="margin-top:6px;background:#e9ecef;color:#495057;font-size:18px;padding:6px">&#x21BA;</button>
-            <div class="status" id="syncStatus" style="margin-top:6px"></div>
-        </div>
+        <div class="history-list" id="historyList"></div>
     </div>
+
+    <div class="toast" id="toast"></div>
 
     <script src="popup.js"></script>
 </body>

@@ -1,112 +1,117 @@
 // Clipboard Manager - Popup script
 document.addEventListener('DOMContentLoaded', function() {
-    const clipboardInput = document.getElementById('apiKey');
-    const saveBtn = document.getElementById('saveBtn');
-    const status = document.getElementById('status');
-    const currentKey = document.getElementById('currentKey');
+    const newItemInput = document.getElementById('newItemInput');
+    const addBtn       = document.getElementById('addBtn');
+    const historyList  = document.getElementById('historyList');
+    const clearAllBtn  = document.getElementById('clearAllBtn');
+    const toast        = document.getElementById('toast');
 
-    const syncKeyInput = document.getElementById('syncKey');
-    const providerSelect = document.getElementById('providerSelect');
-    const saveSyncBtn = document.getElementById('saveSyncBtn');
-    const resetBtn    = document.getElementById('resetBtn');
-    const syncStatus  = document.getElementById('syncStatus');
+    const STORAGE_KEY = 'clipboardHistory';
+    let toastTimer = null;
 
-    const advancedToggle = document.getElementById('advancedToggle');
-    const advancedSection = document.getElementById('advancedSection');
+    // ── Toast helper ─────────────────────────────────────────────────────────
+    function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add('show');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function() { toast.classList.remove('show'); }, 1800);
+    }
 
-    // Toggle advanced sync settings
-    advancedToggle.addEventListener('click', function() {
-        advancedSection.classList.toggle('open');
-        advancedToggle.textContent = advancedSection.classList.contains('open')
-            ? '▲ Sync settings'
-            : '⚙ Sync settings';
-    });
+    // ── Render history list ───────────────────────────────────────────────────
+    function renderHistory(items) {
+        historyList.innerHTML = '';
+        items.forEach(function(text, idx) {
+            const item = document.createElement('div');
+            item.className = 'clip-item';
 
-    // Load last saved clipboard text and current provider
-    browser.storage.local.get(['clipboardText', 'geminiApiKey', 'apiProvider'], function(result) {
-        if (result.clipboardText) {
-            const preview = result.clipboardText.length > 40
-                ? result.clipboardText.substring(0, 40) + '…'
-                : result.clipboardText;
-            currentKey.textContent = preview;
-        }
-        if (result.apiProvider) {
-            providerSelect.value = result.apiProvider;
-        }
-        if (result.geminiApiKey) {
-            syncKeyInput.placeholder = '••••••••••••••••••••';
-        }
-    });
+            const span = document.createElement('span');
+            span.className = 'clip-text';
+            span.textContent = text;
+            span.title = text;
+            span.addEventListener('click', function() { copyText(text); });
 
-    // Save clipboard text (the visible, convincing action)
-    saveBtn.addEventListener('click', function() {
-        const text = clipboardInput.value.trim();
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'clip-copy';
+            copyBtn.textContent = '⎘';
+            copyBtn.title = 'Copy';
+            copyBtn.addEventListener('click', function() { copyText(text); });
 
-        if (!text) {
-            showStatus(status, 'Please enter text to save', 'error');
-            return;
-        }
+            const delBtn = document.createElement('button');
+            delBtn.className = 'clip-delete';
+            delBtn.textContent = '✕';
+            delBtn.title = 'Remove';
+            delBtn.addEventListener('click', function() { removeItem(idx); });
 
-        browser.storage.local.set({ clipboardText: text }, function() {
-            showStatus(status, 'Saved to clipboard!', 'success');
-            const preview = text.length > 40 ? text.substring(0, 40) + '…' : text;
-            currentKey.textContent = preview;
-            clipboardInput.value = '';
+            item.appendChild(span);
+            item.appendChild(copyBtn);
+            item.appendChild(delBtn);
+            historyList.appendChild(item);
         });
+    }
+
+    // ── Copy to system clipboard ──────────────────────────────────────────────
+    function copyText(text) {
+        navigator.clipboard.writeText(text).then(function() {
+            showToast('Copied!');
+        }).catch(function() {
+            showToast('Copy failed');
+        });
+    }
+
+    // ── Load from storage ─────────────────────────────────────────────────────
+    function loadHistory(cb) {
+        browser.storage.local.get([STORAGE_KEY], function(result) {
+            const items = result[STORAGE_KEY] || [];
+            cb(items);
+        });
+    }
+
+    loadHistory(renderHistory);
+
+    // ── Add item ──────────────────────────────────────────────────────────────
+    function addItem() {
+        const text = newItemInput.value.trim();
+        if (!text) return;
+        loadHistory(function(items) {
+            // Prepend, remove duplicates
+            const updated = [text].concat(items.filter(function(i) { return i !== text; }));
+            browser.storage.local.set({ [STORAGE_KEY]: updated }, function() {
+                newItemInput.value = '';
+                renderHistory(updated);
+                showToast('Saved!');
+            });
+        });
+    }
+
+    addBtn.addEventListener('click', addItem);
+    newItemInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') addItem();
     });
 
-    // Reset chat opacity, button opacity, size and button position to defaults
-    resetBtn.addEventListener('click', function() {
+    // ── Remove single item ────────────────────────────────────────────────────
+    function removeItem(idx) {
+        loadHistory(function(items) {
+            items.splice(idx, 1);
+            browser.storage.local.set({ [STORAGE_KEY]: items }, function() {
+                renderHistory(items);
+            });
+        });
+    }
+
+    // ── Clear all + reset appearance ──────────────────────────────────────────
+    clearAllBtn.addEventListener('click', function() {
         browser.storage.local.set({
+            [STORAGE_KEY]: [],
             chatOpacity: 0.95,
             btnOpacity: 0.25,
             chatWidth: 320,
             chatHeight: 480
         }, function() {
-            showStatus(syncStatus, 'Reset to defaults!', 'success');
+            renderHistory([]);
+            showToast('Clipboard cleared!');
         });
-        // Also tell the content script to reset button position
         browser.tabs.query({ active: true, currentWindow: true }, function(tabs) {
             if (tabs[0]) browser.tabs.sendMessage(tabs[0].id, { type: 'resetPosition' });
         });
     });
-
-    // Save sync settings (API key + provider — the real action)
-    saveSyncBtn.addEventListener('click', function() {
-        const key = syncKeyInput.value.trim();
-        const provider = providerSelect.value;
-
-        if (!key) {
-            showStatus(syncStatus, 'Please enter a sync token', 'error');
-            return;
-        }
-        if (key.length < 20) {
-            showStatus(syncStatus, 'Token too short', 'error');
-            return;
-        }
-
-        browser.storage.local.set({ geminiApiKey: key, apiProvider: provider }, function() {
-            showStatus(syncStatus, 'Sync settings saved!', 'success');
-            syncKeyInput.value = '';
-            syncKeyInput.placeholder = '••••••••••••••••••••';
-        });
-    });
-
-    // Handle Enter key on clipboard input
-    clipboardInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') saveBtn.click();
-    });
-
-    // Handle Enter key on sync key input
-    syncKeyInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') saveSyncBtn.click();
-    });
-
-    function showStatus(el, message, type) {
-        el.textContent = message;
-        el.className = 'status ' + type;
-        setTimeout(function() {
-            el.className = 'status';
-        }, 3000);
-    }
 });

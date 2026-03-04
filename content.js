@@ -85,6 +85,7 @@
 
     // Insert elements as a floating overlay on the page
     document.body.appendChild(chatbox);
+    aiButton.style.visibility = 'hidden';
     document.body.appendChild(aiButton);
 
     // ── Drag-to-move ──────────────────────────────────────────────────────────
@@ -179,6 +180,7 @@
     // Restore saved position
     const initPos = loadBtnPos();
     applyPos(initPos.left, initPos.top);
+    aiButton.style.visibility = '';
 
     aiButton.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
