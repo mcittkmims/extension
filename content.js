@@ -55,13 +55,13 @@
             </div>
             <label for="ai-opacity-slider" style="margin-top:8px">Chat Opacity</label>
             <div style="display:flex;align-items:center;gap:8px">
-                <input type="range" id="ai-opacity-slider" min="10" max="100" step="5" value="95" style="flex:1">
-                <span id="ai-opacity-value" style="font-size:11px;color:#495057;min-width:30px;text-align:right">95%</span>
+                <input type="range" id="ai-opacity-slider" min="5" max="100" step="5" value="95" style="flex:1">
+                <span id="ai-opacity-value" style="font-size:11px;color:inherit;min-width:30px;text-align:right">95%</span>
             </div>
             <label for="ai-btn-opacity-slider" style="margin-top:8px">Button Opacity</label>
             <div style="display:flex;align-items:center;gap:8px">
-                <input type="range" id="ai-btn-opacity-slider" min="10" max="100" step="5" value="60" style="flex:1">
-                <span id="ai-btn-opacity-value" style="font-size:11px;color:#495057;min-width:30px;text-align:right">60%</span>
+                <input type="range" id="ai-btn-opacity-slider" min="5" max="100" step="5" value="60" style="flex:1">
+                <span id="ai-btn-opacity-value" style="font-size:11px;color:inherit;min-width:30px;text-align:right">60%</span>
             </div>
         </div>
         <div class="ai-chatbox-messages">
@@ -110,16 +110,14 @@
     let isDragging = false, dragMoved = false;
     let dragStartX = 0, dragStartY = 0, btnStartLeft = 0, btnStartTop = 0;
 
-    function loadBtnPos() {
-        try {
-            const s = localStorage.getItem(POS_KEY);
-            if (s) return JSON.parse(s);
-        } catch(e) {}
-        return { left: window.innerWidth - 38, top: window.innerHeight - 38 };
+    function loadBtnPos(cb) {
+        browser.storage.local.get([POS_KEY], (result) => {
+            cb(result[POS_KEY] || { left: window.innerWidth - 38, top: window.innerHeight - 38 });
+        });
     }
 
     function saveBtnPos(left, top) {
-        try { localStorage.setItem(POS_KEY, JSON.stringify({ left, top })); } catch(e) {}
+        browser.storage.local.set({ [POS_KEY]: { left, top } });
     }
 
     function clamp(left, top) {
@@ -194,10 +192,47 @@
         return c;
     }
 
-    // Restore saved position
-    const initPos = loadBtnPos();
-    applyPos(initPos.left, initPos.top);
-    aiButton.style.visibility = '';
+    // Restore saved position (async — shared across all websites)
+    loadBtnPos((initPos) => {
+        applyPos(initPos.left, initPos.top);
+        aiButton.style.visibility = '';
+        updateDarkMode();
+    });
+
+    // Detect page dark mode by checking background luminance
+    function getPageLuminance() {
+        const els = [document.documentElement, document.body];
+        for (const el of els) {
+            const bg = window.getComputedStyle(el).backgroundColor;
+            const m = bg.match(/\d+/g);
+            if (!m || m.length < 3) continue;
+            const [r, g, b] = m.map(Number);
+            if (r === 0 && g === 0 && b === 0) continue; // transparent/unset
+            // relative luminance
+            const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return lum;
+        }
+        return 1; // default to light
+    }
+
+    function updateDarkMode() {
+        const lum = getPageLuminance();
+        chatbox.classList.toggle('ai-page-dark', lum < 0.5);
+    }
+
+    updateDarkMode();
+    // Re-check if background changes
+    const _darkObserver = new MutationObserver(updateDarkMode);
+    _darkObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-color-scheme'] });
+    _darkObserver.observe(document.body, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-color-scheme'] });
+
+    // Sync button position in real-time across all open tabs
+    browser.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local' || !changes[POS_KEY]) return;
+        if (isDragging) return; // don't interrupt an active drag
+        const pos = changes[POS_KEY].newValue;
+        if (pos) applyPos(pos.left, pos.top);
+    });
 
     aiButton.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
@@ -205,9 +240,8 @@
         dragMoved   = false;
         dragStartX  = e.clientX;
         dragStartY  = e.clientY;
-        const r     = aiButton.getBoundingClientRect();
-        btnStartLeft = r.left;
-        btnStartTop  = r.top;
+        btnStartLeft = aiButton.offsetLeft;
+        btnStartTop  = aiButton.offsetTop;
         e.preventDefault();
     });
 
@@ -229,8 +263,7 @@
         document.body.style.userSelect = '';
         aiButton.style.cursor = '';
         if (dragMoved) {
-            const r = aiButton.getBoundingClientRect();
-            saveBtnPos(r.left, r.top);
+            saveBtnPos(aiButton.offsetLeft, aiButton.offsetTop);
         } else {
             toggleChatbox();
         }
@@ -1152,7 +1185,7 @@ Begin.`;
             return;
         }
         if (msg.type === 'resetPosition') {
-            try { localStorage.removeItem(POS_KEY); } catch(e) {}
+            browser.storage.local.remove(POS_KEY);
             const c = clamp(window.innerWidth - 38, window.innerHeight - 38);
             applyPos(c.left, c.top);
             applyChatSize(320, 480);

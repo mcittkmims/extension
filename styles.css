@@ -1,5 +1,4 @@
 /* Clipboard Extension Styles */
-/* Subtle integration with Moodle theme */
 
 /* Clipboard Button - fixed floating, tiny and transparent */
 #moodle-ai-assistant-btn {
@@ -18,8 +17,7 @@
     cursor: pointer;
     font-size: 10px;
     font-family: inherit;
-    transition: background 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, opacity 0.2s ease-in-out;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    transition: background 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
     cursor: grab;
     touch-action: none;
 }
@@ -28,14 +26,12 @@
     background: rgba(255, 255, 255, 0.9);
     color: #495057;
     border-color: rgba(150, 150, 150, 0.5);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
 #moodle-ai-assistant-btn.active {
     background: rgba(255, 255, 255, 0.95);
     color: #495057;
     border-color: #adb5bd;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
 #moodle-ai-assistant-btn svg {
@@ -65,15 +61,15 @@
     display: flex;
 }
 
-/* Chatbox Header - ELSE orange color */
+/* Chatbox Header */
 .ai-chatbox-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 10px 12px;
-    background: #ffae00;
-    color: white;
-    border-bottom: 1px solid rgba(0,0,0,.125);
+    background: #e9ecef;
+    color: #343a40;
+    border-bottom: 1px solid #dee2e6;
     border-radius: 8px 8px 0 0;
     flex-shrink: 0;
 }
@@ -83,27 +79,24 @@
     font-size: 13px;
 }
 
-.ai-chatbox-close {
-    background: none;
-    border: none;
-    color: white;
+#moodle-ai-chatbox .ai-chatbox-close {
+    all: unset;
+    color: inherit;
     font-size: 20px;
     cursor: pointer;
-    padding: 0;
     line-height: 1;
     opacity: 0.8;
     transition: opacity 0.15s;
 }
 
-.ai-chatbox-close:hover {
+#moodle-ai-chatbox .ai-chatbox-close:hover {
     opacity: 1;
 }
 
 /* Settings toggle in header */
-.ai-chatbox-settings-btn {
-    background: none;
-    border: none;
-    color: white;
+#moodle-ai-chatbox .ai-chatbox-settings-btn {
+    all: unset;
+    color: inherit;
     cursor: pointer;
     padding: 2px 6px;
     opacity: 0.8;
@@ -111,7 +104,7 @@
     font-size: 14px;
 }
 
-.ai-chatbox-settings-btn:hover {
+#moodle-ai-chatbox .ai-chatbox-settings-btn:hover {
     opacity: 1;
 }
 
@@ -152,12 +145,14 @@
     font-size: 12px;
     font-family: inherit;
     box-sizing: border-box;
+    background-color: #ffffff;
+    color: #1d2125;
 }
 
 .ai-settings-panel input:focus {
     outline: none;
-    border-color: #ffae00;
-    box-shadow: 0 0 0 2px rgba(255, 174, 0, 0.25);
+    border-color: #5a5a5a;
+    box-shadow: 0 0 0 2px rgba(90, 90, 90, 0.2);
 }
 
 .ai-settings-panel select {
@@ -167,15 +162,16 @@
     border-radius: 4px;
     font-size: 12px;
     font-family: inherit;
-    background: #ffffff;
+    background-color: #ffffff;
+    color: #1d2125;
     cursor: pointer;
     margin-bottom: 4px;
 }
 
 .ai-settings-panel select:focus {
     outline: none;
-    border-color: #ffae00;
-    box-shadow: 0 0 0 2px rgba(255, 174, 0, 0.25);
+    border-color: #5a5a5a;
+    box-shadow: 0 0 0 2px rgba(90, 90, 90, 0.2);
 }
 
 .ai-settings-panel .settings-hint {
@@ -185,7 +181,7 @@
 }
 
 .ai-settings-panel button:hover {
-    background: #e09900;
+    background: #333333;
 }
 
 .ai-settings-panel input[type="range"] {
@@ -195,7 +191,7 @@
     border-radius: 4px;
     box-shadow: none;
     background: #dee2e6;
-    accent-color: #ffae00;
+    accent-color: #4a4a4a;
     cursor: pointer;
     height: 4px;
 }
@@ -243,7 +239,7 @@
 }
 
 .ai-message.ai-user p {
-    background: #ffae00;
+    background: #6c757d;
     color: white;
     margin-left: 15%;
     border-bottom-right-radius: 2px;
@@ -361,7 +357,7 @@
 .ai-typing-indicator span {
     width: 6px;
     height: 6px;
-    background: #ffae00;
+    background: #5a5a5a;
     border-radius: 50%;
     animation: bounce 1.4s infinite ease-in-out both;
 }
@@ -397,8 +393,8 @@
 
 .ai-chatbox-dropzone:hover,
 .ai-chatbox-dropzone.dragover {
-    border-color: #ffae00;
-    background: #fff8e6;
+    border-color: #5a5a5a;
+    background: #f0f0f0;
 }
 
 .ai-dropzone-content {
@@ -476,6 +472,8 @@
     border: 1px solid #ced4da;
     border-radius: 4px;
     font-size: 12px;
+    background-color: #ffffff;
+    color: #1d2125;
     resize: none;
     font-family: inherit;
     transition: border-color 0.15s, box-shadow 0.15s;
@@ -483,16 +481,16 @@
 
 .ai-chatbox-input:focus {
     outline: none;
-    border-color: #ffae00;
-    box-shadow: 0 0 0 2px rgba(255, 174, 0, 0.25);
+    border-color: #5a5a5a;
+    box-shadow: 0 0 0 2px rgba(90, 90, 90, 0.2);
 }
 
 .ai-chatbox-send {
     flex-shrink: 0;
     padding: 8px 12px;
-    background: #ffae00;
-    color: white;
-    border: none;
+    background: #e9ecef;
+    color: #343a40;
+    border: 1px solid #ced4da;
     border-radius: 4px;
     cursor: pointer;
     transition: background 0.15s;
@@ -502,7 +500,7 @@
 }
 
 .ai-chatbox-send:hover {
-    background: #e09900;
+    background: #d3d7db;
 }
 
 .ai-chatbox-send:disabled {
@@ -518,9 +516,9 @@
 .ai-chatbox-quiz-btn {
     flex-shrink: 0;
     padding: 8px 10px;
-    background: #6c757d;
-    color: white;
-    border: none;
+    background: #e9ecef;
+    color: #343a40;
+    border: 1px solid #ced4da;
     border-radius: 4px;
     cursor: pointer;
     transition: background 0.15s;
@@ -530,7 +528,7 @@
 }
 
 .ai-chatbox-quiz-btn:hover {
-    background: #495057;
+    background: #d3d7db;
 }
 
 .ai-chatbox-quiz-btn svg {
@@ -585,7 +583,7 @@
 }
 
 .ai-resize-corner:hover::after {
-    border-color: #ffae00;
+    border-color: #5a5a5a;
 }
 
 /* Resize handle */
@@ -608,4 +606,124 @@
 
 .ai-chatbox-messages::-webkit-scrollbar-thumb:hover {
     background: #adb5bd;
+}
+
+/* Dark Mode Support - applied via JS when page background is dark */
+#moodle-ai-chatbox.ai-page-dark {
+    background: #2d2d2d;
+    border-color: rgba(255,255,255,.12);
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-header {
+    background: #2a2a2a;
+    color: #e0e0e0;
+    border-bottom-color: rgba(0,0,0,.3);
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-settings-panel {
+    background: #3d3d3d;
+    border-color: #4d4d4d;
+    color: #e0e0e0;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-settings-panel label {
+    color: #b0b0b0;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-settings-panel .settings-hint {
+    color: #b0b0b0;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-settings-panel input,
+#moodle-ai-chatbox.ai-page-dark .ai-settings-panel select {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border-color: #555;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-settings-panel input:focus,
+#moodle-ai-chatbox.ai-page-dark .ai-settings-panel select:focus {
+    border-color: #888;
+    box-shadow: 0 0 0 2px rgba(136, 136, 136, 0.2);
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-messages {
+    background: #3d3d3d;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-message.ai-assistant p {
+    background: #2d2d2d;
+    color: #e0e0e0;
+    border-color: #4d4d4d;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-markdown {
+    background: #2d2d2d;
+    color: #e0e0e0;
+    border-color: #4d4d4d;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-markdown code {
+    background: #1e1e1e;
+    border-color: #555;
+    color: #d4d4d4;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-markdown pre {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border: 1px solid #4d4d4d;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-typing-indicator {
+    background: #2d2d2d;
+    border-color: #4d4d4d;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-dropzone {
+    background: #2d2d2d;
+    border-color: #555;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-dropzone-content {
+    color: #b0b0b0;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-input-container {
+    background: #3d3d3d;
+    border-top-color: #4d4d4d;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-input {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border-color: #555;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-send,
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-quiz-btn {
+    background: #3a3a3a;
+    color: #e0e0e0;
+    border-color: #555;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-send:hover,
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-quiz-btn:hover {
+    background: #444;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-message.ai-user p {
+    background: #5a5a5a;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-messages::-webkit-scrollbar-track {
+    background: #3d3d3d;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-messages::-webkit-scrollbar-thumb {
+    background: #555;
+}
+
+#moodle-ai-chatbox.ai-page-dark .ai-chatbox-messages::-webkit-scrollbar-thumb:hover {
+    background: #666;
 }
