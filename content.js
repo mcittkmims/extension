@@ -226,12 +226,29 @@
     _darkObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-color-scheme'] });
     _darkObserver.observe(document.body, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-color-scheme'] });
 
-    // Sync button position in real-time across all open tabs
+    // Sync button position + receive API responses relayed through storage
     browser.storage.onChanged.addListener((changes, area) => {
-        if (area !== 'local' || !changes[POS_KEY]) return;
-        if (isDragging) return; // don't interrupt an active drag
-        const pos = changes[POS_KEY].newValue;
-        if (pos) applyPos(pos.left, pos.top);
+        if (area !== 'local') return;
+
+        if (changes[POS_KEY] && !isDragging) {
+            const pos = changes[POS_KEY].newValue;
+            if (pos) applyPos(pos.left, pos.top);
+        }
+
+        for (const [key, change] of Object.entries(changes)) {
+            if (key === POS_KEY || !change.newValue) continue;
+            const pending = _pendingAPIRequests.get(key);
+            if (pending) {
+                _pendingAPIRequests.delete(key);
+                browser.storage.local.remove(key); // clean up relay entry
+                const resp = change.newValue;
+                if (resp.success) {
+                    pending.resolve(resp.text);
+                } else {
+                    pending.reject(new Error(resp.error || 'Request failed'));
+                }
+            }
+        }
     });
 
     aiButton.addEventListener('mousedown', (e) => {
@@ -271,6 +288,7 @@
     // ─────────────────────────────────────────────────────────────────────────
 
     // State
+    const _pendingAPIRequests = new Map(); // requestId -> { resolve, reject }
     let isOpen = false;
     let settingsOpen = false;
     let currentImageBase64 = null;
@@ -864,21 +882,37 @@
         };
 
         // Send request through background script to avoid CORS
+        const requestId = Math.random().toString(36).slice(2) + Date.now();
         return new Promise((resolve, reject) => {
+            // Safety timeout — reject if no response within 3 minutes
+            const timeout = setTimeout(() => {
+                if (_pendingAPIRequests.has(requestId)) {
+                    _pendingAPIRequests.delete(requestId);
+                    reject(new Error('Request timed out. Please try again.'));
+                }
+            }, 180000);
+
+            _pendingAPIRequests.set(requestId, {
+                resolve: (v) => { clearTimeout(timeout); resolve(v); },
+                reject:  (e) => { clearTimeout(timeout); reject(e); }
+            });
+
             browser.runtime.sendMessage({
                 type: 'sendToAPI',
+                requestId,
                 apiKey: apiKey,
                 requestBody: requestBody,
                 provider: provider,
                 opencodeConfig,
                 pageKey: getPageSessionKey()
-            }, (response) => {
+            }, () => {
+                // If the background script itself failed to receive the message, reject immediately
                 if (browser.runtime.lastError) {
-                    reject(new Error(browser.runtime.lastError.message));
-                } else if (response.success) {
-                    resolve(response.text);
-                } else {
-                    reject(new Error(response.error || 'Request failed'));
+                    const pending = _pendingAPIRequests.get(requestId);
+                    if (pending) {
+                        _pendingAPIRequests.delete(requestId);
+                        pending.reject(new Error('Could not reach background script. Try reloading the page.'));
+                    }
                 }
             });
         });

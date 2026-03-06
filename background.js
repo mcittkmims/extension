@@ -57,8 +57,13 @@ function callGemini(apiKey, requestBody) {
     )
     .then(response => {
         if (!response.ok) {
-            return response.json().then(err => {
-                throw new Error(err.error?.message || `Request failed: ${response.status}`);
+            return response.text().then(text => {
+                try {
+                    const err = JSON.parse(text);
+                    throw new Error(err.error?.message || `Request failed: ${response.status}`);
+                } catch (parseErr) {
+                    throw new Error(`Request failed: ${response.status} ${text}`);
+                }
             });
         }
         return response.json();
@@ -83,8 +88,13 @@ function callOpenAI(apiKey, requestBody) {
     })
     .then(response => {
         if (!response.ok) {
-            return response.json().then(err => {
-                throw new Error(err.error?.message || `Request failed: ${response.status}`);
+            return response.text().then(text => {
+                try {
+                    const err = JSON.parse(text);
+                    throw new Error(err.error?.message || `Request failed: ${response.status}`);
+                } catch (parseErr) {
+                    throw new Error(`Request failed: ${response.status} ${text}`);
+                }
             });
         }
         return response.json();
@@ -110,8 +120,13 @@ function callAnthropic(apiKey, requestBody) {
     })
     .then(response => {
         if (!response.ok) {
-            return response.json().then(err => {
-                throw new Error(err.error?.message || `Request failed: ${response.status}`);
+            return response.text().then(text => {
+                try {
+                    const err = JSON.parse(text);
+                    throw new Error(err.error?.message || `Request failed: ${response.status}`);
+                } catch (parseErr) {
+                    throw new Error(`Request failed: ${response.status} ${text}`);
+                }
             });
         }
         return response.json();
@@ -135,8 +150,13 @@ function callGrok(apiKey, requestBody) {
     })
     .then(response => {
         if (!response.ok) {
-            return response.json().then(err => {
-                throw new Error(err.error?.message || `Request failed: ${response.status}`);
+            return response.text().then(text => {
+                try {
+                    const err = JSON.parse(text);
+                    throw new Error(err.error?.message || `Request failed: ${response.status}`);
+                } catch (parseErr) {
+                    throw new Error(`Request failed: ${response.status} ${text}`);
+                }
             });
         }
         return response.json();
@@ -162,8 +182,13 @@ function callOpenRouter(apiKey, requestBody) {
     })
     .then(response => {
         if (!response.ok) {
-            return response.json().then(err => {
-                throw new Error(err.error?.message || `Request failed: ${response.status}`);
+            return response.text().then(text => {
+                try {
+                    const err = JSON.parse(text);
+                    throw new Error(err.error?.message || `Request failed: ${response.status}`);
+                } catch (parseErr) {
+                    throw new Error(`Request failed: ${response.status} ${text}`);
+                }
             });
         }
         return response.json();
@@ -444,7 +469,7 @@ browser.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
     // Handle API requests from content script (to avoid CORS)
     if (request.type === 'sendToAPI') {
-        const { apiKey, requestBody, provider, opencodeConfig, pageKey } = request;
+        const { apiKey, requestBody, provider, opencodeConfig, pageKey, requestId } = request;
         const selectedProvider = provider || 'gemini';
 
         let apiCall;
@@ -472,12 +497,14 @@ browser.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
         apiCall
             .then(text => {
-                sendResponse({ success: true, text: text });
+                browser.storage.local.set({ [requestId]: { success: true, text } });
             })
             .catch(error => {
-                sendResponse({ success: false, error: error.message });
+                browser.storage.local.set({ [requestId]: { success: false, error: error.message } });
             });
 
-        return true; // Keep the message channel open for async response
+        // Acknowledge receipt immediately
+        sendResponse({ received: true });
+        return true;
     }
 });
