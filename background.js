@@ -40,6 +40,16 @@ function parseErrorPayload(text) {
     }
 }
 
+function getProviderErrorMessage(text, status) {
+    if (!text) return `Request failed: ${status}`;
+    try {
+        const err = JSON.parse(text);
+        return err.error?.message || `Request failed: ${status}`;
+    } catch (parseErr) {
+        return `Request failed: ${status} ${text}`;
+    }
+}
+
 // --- Provider-specific API handlers ---
 
 function callGemini(apiKey, requestBody) {
@@ -58,12 +68,7 @@ function callGemini(apiKey, requestBody) {
     .then(response => {
         if (!response.ok) {
             return response.text().then(text => {
-                try {
-                    const err = JSON.parse(text);
-                    throw new Error(err.error?.message || `Request failed: ${response.status}`);
-                } catch (parseErr) {
-                    throw new Error(`Request failed: ${response.status} ${text}`);
-                }
+                throw new Error(getProviderErrorMessage(text, response.status));
             });
         }
         return response.json();
@@ -89,12 +94,7 @@ function callOpenAI(apiKey, requestBody) {
     .then(response => {
         if (!response.ok) {
             return response.text().then(text => {
-                try {
-                    const err = JSON.parse(text);
-                    throw new Error(err.error?.message || `Request failed: ${response.status}`);
-                } catch (parseErr) {
-                    throw new Error(`Request failed: ${response.status} ${text}`);
-                }
+                throw new Error(getProviderErrorMessage(text, response.status));
             });
         }
         return response.json();
@@ -121,12 +121,7 @@ function callAnthropic(apiKey, requestBody) {
     .then(response => {
         if (!response.ok) {
             return response.text().then(text => {
-                try {
-                    const err = JSON.parse(text);
-                    throw new Error(err.error?.message || `Request failed: ${response.status}`);
-                } catch (parseErr) {
-                    throw new Error(`Request failed: ${response.status} ${text}`);
-                }
+                throw new Error(getProviderErrorMessage(text, response.status));
             });
         }
         return response.json();
@@ -151,12 +146,7 @@ function callGrok(apiKey, requestBody) {
     .then(response => {
         if (!response.ok) {
             return response.text().then(text => {
-                try {
-                    const err = JSON.parse(text);
-                    throw new Error(err.error?.message || `Request failed: ${response.status}`);
-                } catch (parseErr) {
-                    throw new Error(`Request failed: ${response.status} ${text}`);
-                }
+                throw new Error(getProviderErrorMessage(text, response.status));
             });
         }
         return response.json();
@@ -183,12 +173,7 @@ function callOpenRouter(apiKey, requestBody) {
     .then(response => {
         if (!response.ok) {
             return response.text().then(text => {
-                try {
-                    const err = JSON.parse(text);
-                    throw new Error(err.error?.message || `Request failed: ${response.status}`);
-                } catch (parseErr) {
-                    throw new Error(`Request failed: ${response.status} ${text}`);
-                }
+                throw new Error(getProviderErrorMessage(text, response.status));
             });
         }
         return response.json();
