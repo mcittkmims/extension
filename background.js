@@ -1,46 +1,32 @@
 (function() {
   "use strict";
-  browser.runtime.onInstalled.addListener(function(details) {
-    if (details.reason === "install") {
-      console.log("Quick Notes: Extension installed");
-    } else if (details.reason === "update") {
-      console.log("Quick Notes: Extension updated");
-    }
-  });
-  browser.menus.removeAll().then(function() {
-    browser.menus.create({
-      id: "quiz-screenshot",
-      title: "Add to clipboard",
-      contexts: ["all"]
+  function setupLifecycle() {
+    browser.runtime.onInstalled.addListener(function(details) {
+      if (details.reason === "install") {
+        console.log("Quick Notes: Extension installed");
+      } else if (details.reason === "update") {
+        console.log("Quick Notes: Extension updated");
+      }
     });
-  });
-  browser.menus.onClicked.addListener(function(info, tab) {
-    if (info.menuItemId === "quiz-screenshot" && tab && tab.id) {
-      browser.tabs.sendMessage(tab.id, { type: "quizScreenshot" });
-    }
-  });
-  const OPENCODE_DEFAULT_URL = "http://127.0.0.1:4096";
-  const OPENCODE_SESSION_MAP_KEY = "opencodeSessionsByPage";
-  function parseErrorPayload(text) {
-    if (!text) return "";
-    try {
-      const json = JSON.parse(text);
-      if (json.error && typeof json.error.message === "string")
-        return json.error.message;
-      if (json.data && typeof json.data.message === "string")
-        return json.data.message;
-      if (typeof json.message === "string") return json.message;
-      return text;
-    } catch (e) {
-      return text;
-    }
+    browser.menus.removeAll().then(function() {
+      browser.menus.create({
+        id: "quiz-screenshot",
+        title: "Add to clipboard",
+        contexts: ["all"]
+      });
+    });
+    browser.menus.onClicked.addListener(function(info, tab) {
+      if (info.menuItemId === "quiz-screenshot" && tab && tab.id) {
+        browser.tabs.sendMessage(tab.id, { type: "quizScreenshot" });
+      }
+    });
   }
   function getProviderErrorMessage(text, status) {
     if (!text) return `Request failed: ${status}`;
     try {
       const err = JSON.parse(text);
       return err.error?.message || `Request failed: ${status}`;
-    } catch (parseErr) {
+    } catch {
       return `Request failed: ${status} ${text}`;
     }
   }
@@ -70,12 +56,13 @@
       throw new Error("No response generated");
     });
   }
-  function callOpenAI(apiKey, requestBody) {
-    return fetch("https://api.openai.com/v1/chat/completions", {
+  function callChatCompletions(url, apiKey, requestBody, headers = {}) {
+    return fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
+        Authorization: `Bearer ${apiKey}`,
+        ...headers
       },
       body: JSON.stringify(requestBody)
     }).then((response) => {
@@ -91,6 +78,13 @@
       }
       throw new Error("No response generated");
     });
+  }
+  function callOpenAI(apiKey, requestBody) {
+    return callChatCompletions(
+      "https://api.openai.com/v1/chat/completions",
+      apiKey,
+      requestBody
+    );
   }
   function callAnthropic(apiKey, requestBody) {
     return fetch("https://api.anthropic.com/v1/messages", {
@@ -117,50 +111,40 @@
     });
   }
   function callGrok(apiKey, requestBody) {
-    return fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(requestBody)
-    }).then((response) => {
-      if (!response.ok) {
-        return response.text().then((text) => {
-          throw new Error(getProviderErrorMessage(text, response.status));
-        });
-      }
-      return response.json();
-    }).then((data) => {
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        return data.choices[0].message.content;
-      }
-      throw new Error("No response generated");
-    });
+    return callChatCompletions(
+      "https://api.x.ai/v1/chat/completions",
+      apiKey,
+      requestBody
+    );
   }
   function callOpenRouter(apiKey, requestBody) {
-    return fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+    return callChatCompletions(
+      "https://openrouter.ai/api/v1/chat/completions",
+      apiKey,
+      requestBody,
+      {
         "HTTP-Referer": "https://else.fcim.utm.md",
         "X-Title": "Quick Notes"
-      },
-      body: JSON.stringify(requestBody)
-    }).then((response) => {
-      if (!response.ok) {
-        return response.text().then((text) => {
-          throw new Error(getProviderErrorMessage(text, response.status));
-        });
       }
-      return response.json();
-    }).then((data) => {
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        return data.choices[0].message.content;
+    );
+  }
+  const OPENCODE_DEFAULT_URL = "http://127.0.0.1:4096";
+  const OPENCODE_SESSION_MAP_KEY = "opencodeSessionsByPage";
+  function parseErrorPayload(text) {
+    if (!text) return "";
+    try {
+      const json = JSON.parse(text);
+      if (json.error && typeof json.error.message === "string") {
+        return json.error.message;
       }
-      throw new Error("No response generated");
-    });
+      if (json.data && typeof json.data.message === "string") {
+        return json.data.message;
+      }
+      if (typeof json.message === "string") return json.message;
+      return text;
+    } catch {
+      return text;
+    }
   }
   function normalizeOpenCodeUrl(url) {
     const raw = (url || "").trim();
@@ -185,7 +169,7 @@
       } else {
         port = "80";
       }
-    } catch (e) {
+    } catch {
     }
     return `Cannot reach OpenCode server at ${baseUrl}. If it is local, run:
 opencode serve --hostname ${hostname} --port ${port} --cors ${extensionOrigin}`;
@@ -196,7 +180,7 @@ opencode serve --hostname ${hostname} --port ${port} --cors ${extensionOrigin}`;
     if (options.method && options.method !== "GET") {
       headers["Content-Type"] = headers["Content-Type"] || "application/json";
     }
-    if (authHeader) headers["Authorization"] = authHeader;
+    if (authHeader) headers.Authorization = authHeader;
     const url = `${baseUrl}${path}`;
     let response;
     try {
@@ -224,7 +208,7 @@ Details: ${error.message || "Network error"}`
     if (!text) return {};
     try {
       return JSON.parse(text);
-    } catch (e) {
+    } catch {
       throw new Error("OpenCode returned an invalid JSON response.");
     }
   }
@@ -375,81 +359,87 @@ Details: ${error.message || "Network error"}`
     }
     return { models, defaultModel };
   }
-  browser.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-    if (request.type === "getSyncKey") {
-      browser.storage.local.get(
-        ["geminiApiKey", "apiProvider"],
-        function(result) {
-          sendResponse({
-            syncKey: result.geminiApiKey || null,
-            provider: result.apiProvider || "gemini"
-          });
+  function setupRuntimeMessages() {
+    browser.runtime.onMessage.addListener(
+      function(request, sender, sendResponse) {
+        if (request.type === "getSyncKey") {
+          browser.storage.local.get(
+            ["geminiApiKey", "apiProvider"],
+            function(result) {
+              sendResponse({
+                syncKey: result.geminiApiKey || null,
+                provider: result.apiProvider || "gemini"
+              });
+            }
+          );
+          return true;
         }
-      );
-      return true;
-    }
-    if (request.type === "getOpenCodeModels") {
-      getOpenCodeModels(request.opencodeConfig).then((data) => {
-        sendResponse({
-          success: true,
-          models: data.models,
-          defaultModel: data.defaultModel || ""
-        });
-      }).catch((error) => {
-        sendResponse({ success: false, error: error.message });
-      });
-      return true;
-    }
-    if (request.type === "captureTab") {
-      browser.tabs.captureVisibleTab(null, { format: "png" }).then((dataUrl) => {
-        const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
-        sendResponse({ success: true, base64, mimeType: "image/png" });
-      }).catch((error) => {
-        sendResponse({ success: false, error: error.message });
-      });
-      return true;
-    }
-    if (request.type === "sendToAPI") {
-      const {
-        apiKey,
-        requestBody,
-        provider,
-        opencodeConfig,
-        pageKey,
-        requestId
-      } = request;
-      const selectedProvider = provider || "gemini";
-      let apiCall;
-      switch (selectedProvider) {
-        case "openai":
-          apiCall = callOpenAI(apiKey, requestBody);
-          break;
-        case "anthropic":
-          apiCall = callAnthropic(apiKey, requestBody);
-          break;
-        case "openrouter":
-          apiCall = callOpenRouter(apiKey, requestBody);
-          break;
-        case "grok":
-          apiCall = callGrok(apiKey, requestBody);
-          break;
-        case "opencode":
-          apiCall = callOpenCode(opencodeConfig, requestBody, pageKey);
-          break;
-        case "gemini":
-        default:
-          apiCall = callGemini(apiKey, requestBody);
-          break;
+        if (request.type === "getOpenCodeModels") {
+          getOpenCodeModels(request.opencodeConfig).then((data) => {
+            sendResponse({
+              success: true,
+              models: data.models,
+              defaultModel: data.defaultModel || ""
+            });
+          }).catch((error) => {
+            sendResponse({ success: false, error: error.message });
+          });
+          return true;
+        }
+        if (request.type === "captureTab") {
+          browser.tabs.captureVisibleTab(null, { format: "png" }).then((dataUrl) => {
+            const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
+            sendResponse({ success: true, base64, mimeType: "image/png" });
+          }).catch((error) => {
+            sendResponse({ success: false, error: error.message });
+          });
+          return true;
+        }
+        if (request.type === "sendToAPI") {
+          const {
+            apiKey,
+            requestBody,
+            provider,
+            opencodeConfig,
+            pageKey,
+            requestId
+          } = request;
+          const selectedProvider = provider || "gemini";
+          let apiCall;
+          switch (selectedProvider) {
+            case "openai":
+              apiCall = callOpenAI(apiKey, requestBody);
+              break;
+            case "anthropic":
+              apiCall = callAnthropic(apiKey, requestBody);
+              break;
+            case "openrouter":
+              apiCall = callOpenRouter(apiKey, requestBody);
+              break;
+            case "grok":
+              apiCall = callGrok(apiKey, requestBody);
+              break;
+            case "opencode":
+              apiCall = callOpenCode(opencodeConfig, requestBody, pageKey);
+              break;
+            case "gemini":
+            default:
+              apiCall = callGemini(apiKey, requestBody);
+              break;
+          }
+          apiCall.then((text) => {
+            browser.storage.local.set({ [requestId]: { success: true, text } });
+          }).catch((error) => {
+            browser.storage.local.set({
+              [requestId]: { success: false, error: error.message }
+            });
+          });
+          sendResponse({ received: true });
+          return true;
+        }
       }
-      apiCall.then((text) => {
-        browser.storage.local.set({ [requestId]: { success: true, text } });
-      }).catch((error) => {
-        browser.storage.local.set({
-          [requestId]: { success: false, error: error.message }
-        });
-      });
-      sendResponse({ received: true });
-      return true;
-    }
-  });
+    );
+  }
+  setupLifecycle();
+  setupRuntimeMessages();
 })();

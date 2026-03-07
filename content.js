@@ -1,9 +1,56 @@
 (function() {
   "use strict";
-  (function() {
-    if (document.getElementById("moodle-ai-assistant-btn")) {
-      return;
-    }
+  const OPENCODE_DEFAULT_URL = "http://127.0.0.1:4096";
+  const PROVIDER_MODELS = {
+    gemini: [
+      {
+        value: "gemini-3.1-pro-preview",
+        label: "Gemini 3.1 Pro Preview (latest)"
+      },
+      { value: "gemini-3-flash-preview", label: "Gemini 3 Flash Preview" },
+      { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro (stable)" },
+      { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (stable)" },
+      { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite" }
+    ],
+    openai: [
+      { value: "gpt-5.2", label: "GPT-5.2 (latest)" },
+      { value: "gpt-5.2-pro", label: "GPT-5.2 Pro" },
+      { value: "gpt-5-mini", label: "GPT-5 Mini" },
+      { value: "gpt-5-nano", label: "GPT-5 Nano" },
+      { value: "gpt-4.1", label: "GPT-4.1" },
+      { value: "gpt-4o", label: "GPT-4o" }
+    ],
+    anthropic: [
+      { value: "claude-opus-4-6", label: "Claude Opus 4.6 (latest)" },
+      { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+      { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" }
+    ],
+    openrouter: [
+      {
+        value: "google/gemini-3.1-pro-preview",
+        label: "Gemini 3.1 Pro Preview"
+      },
+      { value: "openai/gpt-5.2", label: "GPT-5.2" },
+      { value: "anthropic/claude-opus-4-6", label: "Claude Opus 4.6" },
+      { value: "anthropic/claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+      { value: "qwen/qwen3.5-122b-a10b", label: "Qwen 3.5 122B" },
+      {
+        value: "meta-llama/llama-3.3-70b-instruct",
+        label: "Llama 3.3 70B"
+      },
+      { value: "deepseek/deepseek-r1", label: "DeepSeek R1" }
+    ],
+    grok: [
+      {
+        value: "grok-4-fast-reasoning",
+        label: "Grok 4 Fast Reasoning (latest)"
+      },
+      { value: "grok-4", label: "Grok 4" },
+      { value: "grok-3", label: "Grok 3" },
+      { value: "grok-3-mini", label: "Grok 3 Mini" }
+    ]
+  };
+  function createOverlay() {
     const aiButton = document.createElement("button");
     aiButton.id = "moodle-ai-assistant-btn";
     aiButton.innerHTML = `
@@ -90,9 +137,514 @@
     document.body.appendChild(chatbox);
     aiButton.style.visibility = "hidden";
     document.body.appendChild(aiButton);
+    return { aiButton, chatbox };
+  }
+  const ALLOWED_MARKDOWN_TAGS = /* @__PURE__ */ new Set([
+    "A",
+    "BLOCKQUOTE",
+    "BR",
+    "CODE",
+    "DEL",
+    "EM",
+    "H1",
+    "H2",
+    "H3",
+    "H4",
+    "H5",
+    "H6",
+    "HR",
+    "LI",
+    "OL",
+    "P",
+    "PRE",
+    "SPAN",
+    "STRONG",
+    "TABLE",
+    "TBODY",
+    "TD",
+    "TH",
+    "THEAD",
+    "TR",
+    "UL"
+  ]);
+  const MARKED_OPTIONS = {
+    gfm: true,
+    breaks: true,
+    headerIds: false,
+    mangle: false
+  };
+  const MARKED_API = globalThis.marked && typeof globalThis.marked.parse === "function" ? globalThis.marked : null;
+  let katexReady = null;
+  function loadKaTeX() {
+    if (!katexReady) katexReady = Promise.resolve();
+    return katexReady;
+  }
+  function renderMath(el) {
+    loadKaTeX().then(() => {
+      if (!window.katex) return;
+      el.querySelectorAll(".ai-math-display").forEach((span) => {
+        try {
+          katex.render(span.dataset.latex, span, {
+            displayMode: true,
+            throwOnError: false
+          });
+        } catch {
+          span.textContent = span.dataset.latex;
+        }
+      });
+      el.querySelectorAll(".ai-math-inline").forEach((span) => {
+        try {
+          katex.render(span.dataset.latex, span, {
+            displayMode: false,
+            throwOnError: false
+          });
+        } catch {
+          span.textContent = span.dataset.latex;
+        }
+      });
+    });
+  }
+  function sanitizeMarkdownNode(node, doc) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return doc.createTextNode(node.textContent);
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return null;
+    }
+    if (!ALLOWED_MARKDOWN_TAGS.has(node.tagName)) {
+      const fragment = doc.createDocumentFragment();
+      Array.from(node.childNodes).forEach((child) => {
+        const sanitizedChild = sanitizeMarkdownNode(child, doc);
+        if (sanitizedChild) fragment.appendChild(sanitizedChild);
+      });
+      return fragment;
+    }
+    const el = doc.createElement(node.tagName.toLowerCase());
+    if (node.tagName === "A") {
+      const href = node.getAttribute("href") || "";
+      if (/^(https?:|mailto:)/i.test(href)) {
+        el.setAttribute("href", href);
+        el.setAttribute("target", "_blank");
+        el.setAttribute("rel", "noopener noreferrer");
+      }
+    } else if (node.tagName === "SPAN") {
+      const cls = node.getAttribute("class") || "";
+      if (cls === "ai-math-display" || cls === "ai-math-inline") {
+        el.setAttribute("class", cls);
+        const latex = node.getAttribute("data-latex");
+        if (latex != null) el.setAttribute("data-latex", latex);
+      }
+    } else if (node.tagName === "CODE") {
+      const cls = node.getAttribute("class") || "";
+      if (/^language-[a-z0-9_-]+$/i.test(cls)) {
+        el.setAttribute("class", cls);
+      }
+    } else if (node.tagName === "TH" || node.tagName === "TD") {
+      const align = node.getAttribute("align");
+      if (align && /^(left|center|right)$/i.test(align)) {
+        el.setAttribute("align", align.toLowerCase());
+      }
+    }
+    Array.from(node.childNodes).forEach((child) => {
+      const sanitizedChild = sanitizeMarkdownNode(child, doc);
+      if (sanitizedChild) el.appendChild(sanitizedChild);
+    });
+    return el;
+  }
+  function sanitizeMarkdownHtml(html) {
+    const parser = new DOMParser();
+    const parsed = parser.parseFromString(html, "text/html");
+    const fragment = document.createDocumentFragment();
+    Array.from(parsed.body.childNodes).forEach((node) => {
+      const sanitizedNode = sanitizeMarkdownNode(node, document);
+      if (sanitizedNode) fragment.appendChild(sanitizedNode);
+    });
+    return fragment;
+  }
+  function extractMath(text) {
+    const mathStore = [];
+    const stash = (latex, display) => {
+      const idx = mathStore.length;
+      mathStore.push({ latex: latex.trim(), display });
+      return `\0MATH${idx}\0`;
+    };
+    return {
+      text: text.replace(/\\\[([\s\S]*?)\\\]/g, (_, latex) => stash(latex, true)).replace(/\\\(([\s\S]*?)\\\)/g, (_, latex) => stash(latex, false)).replace(
+        /(?<!\$)\$(?!\$)([^$\n]+?)\$/g,
+        (_, latex) => stash(latex, false)
+      ).replace(/\$\$([\s\S]*?)\$\$/g, (_, latex) => stash(latex, true)),
+      mathStore
+    };
+  }
+  function renderMarkdown(text) {
+    return MARKED_API ? MARKED_API.parse(text, MARKED_OPTIONS) : `<p>${text}</p>`;
+  }
+  function restoreMath(html, mathStore) {
+    return html.replace(/\x00MATH(\d+)\x00/g, (_, i) => {
+      const { latex, display } = mathStore[+i];
+      const cls = display ? "ai-math-display" : "ai-math-inline";
+      const escaped = latex.replace(/"/g, "&quot;");
+      return `<span class="${cls}" data-latex="${escaped}"></span>`;
+    });
+  }
+  function parseMarkdown(text) {
+    const parsed = extractMath(text);
+    const html = renderMarkdown(parsed.text);
+    return sanitizeMarkdownHtml(restoreMath(html, parsed.mathStore));
+  }
+  function imageFilenameForMime(mimeType) {
+    const map = {
+      "image/jpeg": "image.jpg",
+      "image/png": "image.png",
+      "image/webp": "image.webp",
+      "image/gif": "image.gif",
+      "image/bmp": "image.bmp",
+      "image/heic": "image.heic",
+      "image/heif": "image.heif"
+    };
+    return map[mimeType] || "image.bin";
+  }
+  function buildRequestBody(provider, model, text, imageBase64, imageMimeType) {
+    const instruction = "You are a helpful AI assistant. Respond using Markdown formatting where appropriate: use **bold**, *italic*, `inline code`, ```code blocks```, bullet lists, numbered lists, and headers. For short factual answers (a letter, number, or single word) just reply directly without extra markup.";
+    const userText = text ? "Question: " + text : "What is the correct answer to this question shown in the image?";
+    if (provider === "gemini") {
+      const modelId = model || "gemini-3.1-pro-preview";
+      const parts = [];
+      parts.push({ text: instruction });
+      if (imageBase64 && imageMimeType) {
+        parts.push({
+          inline_data: { mime_type: imageMimeType, data: imageBase64 }
+        });
+      }
+      parts.push({ text: userText });
+      return {
+        _geminiModel: modelId,
+        contents: [{ parts }],
+        generationConfig: {
+          temperature: 0.1,
+          topK: 1,
+          topP: 0.8,
+          maxOutputTokens: 2048
+        }
+      };
+    }
+    if (provider === "openai" || provider === "openrouter") {
+      const messages = [{ role: "system", content: instruction }];
+      const userContent = [];
+      if (imageBase64 && imageMimeType) {
+        userContent.push({
+          type: "image_url",
+          image_url: { url: `data:${imageMimeType};base64,${imageBase64}` }
+        });
+      }
+      userContent.push({ type: "text", text: userText });
+      messages.push({ role: "user", content: userContent });
+      const defaultModel = provider === "openai" ? "gpt-5.2" : "google/gemini-3.1-pro-preview";
+      return {
+        model: model || defaultModel,
+        messages,
+        temperature: 0.1,
+        max_tokens: 2048
+      };
+    }
+    if (provider === "grok") {
+      const selectedModel = model || "grok-4-fast-reasoning";
+      const messages = [{ role: "system", content: instruction }];
+      const userContent = [];
+      if (imageBase64 && imageMimeType) {
+        userContent.push({
+          type: "image_url",
+          image_url: { url: `data:${imageMimeType};base64,${imageBase64}` }
+        });
+      }
+      userContent.push({ type: "text", text: userText });
+      messages.push({ role: "user", content: userContent });
+      return {
+        model: selectedModel,
+        messages,
+        stream: false,
+        temperature: 0,
+        max_tokens: 2048
+      };
+    }
+    if (provider === "anthropic") {
+      const userContent = [];
+      if (imageBase64 && imageMimeType) {
+        userContent.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: imageMimeType,
+            data: imageBase64
+          }
+        });
+      }
+      userContent.push({ type: "text", text: userText });
+      return {
+        model: model || "claude-sonnet-4-6",
+        max_tokens: 2048,
+        system: instruction,
+        messages: [{ role: "user", content: userContent }]
+      };
+    }
+    if (provider === "opencode") {
+      const parts = [];
+      if (imageBase64 && imageMimeType) {
+        parts.push({
+          type: "file",
+          mime: imageMimeType,
+          filename: imageFilenameForMime(imageMimeType),
+          url: `data:${imageMimeType};base64,${imageBase64}`
+        });
+      }
+      parts.push({ type: "text", text: userText });
+      const body = {
+        system: instruction,
+        parts
+      };
+      if (model && model.includes("/")) {
+        const splitIndex = model.indexOf("/");
+        body.model = {
+          providerID: model.slice(0, splitIndex),
+          modelID: model.slice(splitIndex + 1)
+        };
+      }
+      return body;
+    }
+    return {};
+  }
+  async function sendToAI({
+    text,
+    imageBase64 = null,
+    imageMimeType = null,
+    settings,
+    normalizeOpenCodeUrl: normalizeOpenCodeUrl2,
+    getPageSessionKey,
+    pendingRequests
+  }) {
+    const { key: apiKey, provider, model } = settings;
+    if (provider !== "opencode" && !apiKey) {
+      throw new Error("API key not configured. Click ⚙️ to set up.");
+    }
+    const requestBody = buildRequestBody(
+      provider,
+      model,
+      text,
+      imageBase64,
+      imageMimeType
+    );
+    const opencodeConfig = {
+      baseUrl: normalizeOpenCodeUrl2(settings.opencodeUrl),
+      password: settings.opencodePassword || ""
+    };
+    const requestId = Math.random().toString(36).slice(2) + Date.now();
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (pendingRequests.has(requestId)) {
+          pendingRequests.delete(requestId);
+          reject(new Error("Request timed out. Please try again."));
+        }
+      }, 18e4);
+      pendingRequests.set(requestId, {
+        resolve: (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        reject: (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      });
+      browser.runtime.sendMessage(
+        {
+          type: "sendToAPI",
+          requestId,
+          apiKey,
+          requestBody,
+          provider,
+          opencodeConfig,
+          pageKey: getPageSessionKey()
+        },
+        () => {
+          if (browser.runtime.lastError) {
+            const pending = pendingRequests.get(requestId);
+            if (pending) {
+              pendingRequests.delete(requestId);
+              pending.reject(
+                new Error(
+                  "Could not reach background script. Try reloading the page."
+                )
+              );
+            }
+          }
+        }
+      );
+    });
+  }
+  function setModelOptions(models, savedModel) {
+    const modelSelect = document.getElementById("ai-model-select");
+    modelSelect.innerHTML = "";
+    models.forEach((m) => {
+      const opt = document.createElement("option");
+      opt.value = m.value;
+      opt.textContent = m.label;
+      modelSelect.appendChild(opt);
+    });
+    if (savedModel && models.some((m) => m.value === savedModel)) {
+      modelSelect.value = savedModel;
+    } else if (models.length > 0) {
+      modelSelect.value = models[0].value;
+    }
+  }
+  function normalizeOpenCodeUrl(url) {
+    const raw = (url || "").trim();
+    if (!raw) return OPENCODE_DEFAULT_URL;
+    return raw.replace(/\/$/, "");
+  }
+  function updateProviderSettingsUI(provider) {
+    const isOpenCode = provider === "opencode";
+    document.getElementById("ai-api-key-group").classList.toggle("hidden", isOpenCode);
+    document.getElementById("ai-opencode-group").classList.toggle("hidden", !isOpenCode);
+  }
+  function fetchOpenCodeModels(opencodeConfig) {
+    return new Promise((resolve, reject) => {
+      browser.runtime.sendMessage(
+        {
+          type: "getOpenCodeModels",
+          opencodeConfig
+        },
+        (response) => {
+          if (browser.runtime.lastError) {
+            reject(new Error(browser.runtime.lastError.message));
+            return;
+          }
+          if (!response || !response.success) {
+            reject(
+              new Error(
+                response && response.error ? response.error : "Failed to load models"
+              )
+            );
+            return;
+          }
+          resolve(response);
+        }
+      );
+    });
+  }
+  async function populateModels(provider, savedModel, settings, modelCache) {
+    if (provider !== "opencode") {
+      setModelOptions(PROVIDER_MODELS[provider] || [], savedModel);
+      return;
+    }
+    const modelSelect = document.getElementById("ai-model-select");
+    const status = document.getElementById("ai-opencode-status");
+    modelSelect.innerHTML = "";
+    const loading = document.createElement("option");
+    loading.value = "";
+    loading.textContent = "Loading models...";
+    modelSelect.appendChild(loading);
+    const conf = settings || await getApiKey();
+    const opencodeConfig = {
+      baseUrl: normalizeOpenCodeUrl(conf.opencodeUrl),
+      password: conf.opencodePassword || ""
+    };
+    const cacheKey = `${opencodeConfig.baseUrl}::${opencodeConfig.password}`;
+    try {
+      let serverModels = [];
+      let defaultModel = "";
+      if (modelCache.key === cacheKey && modelCache.models.length > 0) {
+        serverModels = modelCache.models;
+      } else {
+        const data = await fetchOpenCodeModels(opencodeConfig);
+        serverModels = Array.isArray(data.models) ? data.models : [];
+        defaultModel = data.defaultModel || "";
+        modelCache.key = cacheKey;
+        modelCache.models = serverModels;
+      }
+      const merged = [{ value: "", label: "Server default model" }].concat(
+        serverModels
+      );
+      setModelOptions(merged, savedModel || defaultModel || "");
+      status.textContent = `Connected to ${opencodeConfig.baseUrl}`;
+    } catch (error) {
+      setModelOptions([{ value: "", label: "Server default model" }], "");
+      status.textContent = `Model fetch failed: ${error.message}`;
+    }
+  }
+  async function getApiKey() {
+    return new Promise((resolve) => {
+      browser.storage.local.get(
+        [
+          "geminiApiKey",
+          "apiProvider",
+          "apiModel",
+          "opencodeServerUrl",
+          "opencodePassword",
+          "chatOpacity",
+          "btnOpacity",
+          "chatWidth",
+          "chatHeight"
+        ],
+        (result) => {
+          resolve({
+            key: result.geminiApiKey || null,
+            provider: result.apiProvider || "gemini",
+            model: result.apiModel || null,
+            opencodeUrl: result.opencodeServerUrl || OPENCODE_DEFAULT_URL,
+            opencodePassword: result.opencodePassword || "",
+            opacity: result.chatOpacity != null ? result.chatOpacity : 0.95,
+            btnOpacity: result.btnOpacity != null ? result.btnOpacity : 0.25,
+            chatWidth: result.chatWidth != null ? result.chatWidth : 320,
+            chatHeight: result.chatHeight != null ? result.chatHeight : 480
+          });
+        }
+      );
+    });
+  }
+  async function saveApiKey(key, provider, model, opencodeUrl, opencodePassword, opacity, btnOp, chatWidth, chatHeight) {
+    return new Promise((resolve) => {
+      browser.storage.local.set(
+        {
+          geminiApiKey: key,
+          apiProvider: provider,
+          apiModel: model,
+          opencodeServerUrl: normalizeOpenCodeUrl(opencodeUrl),
+          opencodePassword: opencodePassword || "",
+          chatOpacity: opacity,
+          btnOpacity: btnOp,
+          chatWidth,
+          chatHeight
+        },
+        resolve
+      );
+    });
+  }
+  (function() {
+    if (document.getElementById("moodle-ai-assistant-btn")) {
+      return;
+    }
+    const { aiButton, chatbox } = createOverlay();
     const POS_KEY = "ai_btn_pos";
-    let isDragging = false, dragMoved = false;
-    let dragStartX = 0, dragStartY = 0, btnStartLeft = 0, btnStartTop = 0;
+    const pendingAPIRequests = /* @__PURE__ */ new Map();
+    let isDragging = false;
+    let dragMoved = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let btnStartLeft = 0;
+    let btnStartTop = 0;
+    let isOpen = false;
+    let settingsOpen = false;
+    let settingsLoaded = false;
+    let currentImageBase64 = null;
+    let currentImageMimeType = null;
+    let settingsMinHeight = 354;
+    let opencodeModelCache = { key: "", models: [] };
+    let resizeCornerVertical = "top";
+    let resizeCornerHorizontal = "left";
+    let resizeAnchorX = 0;
+    let resizeAnchorY = 0;
+    let isResizing = false;
+    let viewportNormalizeTimer = null;
     function loadBtnPos(cb) {
       browser.storage.local.get([POS_KEY], (result) => {
         cb(result[POS_KEY] || getDefaultButtonPos());
@@ -155,7 +707,7 @@
       const availableWidth = Math.max(1, viewport.width - 8);
       const availableHeight = Math.max(1, viewport.height - 8);
       const minWidth = Math.min(220, availableWidth);
-      const minHeight = Math.min(_settingsMinH, availableHeight);
+      const minHeight = Math.min(settingsMinHeight, availableHeight);
       return {
         minWidth,
         maxWidth: Math.max(minWidth, Math.min(700, availableWidth)),
@@ -163,11 +715,6 @@
         maxHeight: Math.max(minHeight, Math.min(700, availableHeight))
       };
     }
-    let _cornerV = "bottom";
-    let _cornerH = "right";
-    let resizeRV = "top";
-    let resizeRH = "left";
-    let resizeAnchorX = 0, resizeAnchorY = 0;
     function computeLayout(left, top) {
       const viewportBounds = getViewportBounds();
       const boxW = chatbox.offsetWidth || 320;
@@ -236,12 +783,7 @@
         viewportBounds.top + margin,
         viewportBounds.top + viewportBounds.height - boxH - margin
       );
-      let chatLeft;
-      if (isButtonLeft) {
-        chatLeft = finalLeft;
-      } else {
-        chatLeft = finalLeft + bw - boxW;
-      }
+      let chatLeft = isButtonLeft ? finalLeft : finalLeft + bw - boxW;
       chatLeft = clampValue(
         chatLeft,
         viewportBounds.left + margin,
@@ -256,39 +798,55 @@
         isButtonLeft
       };
     }
-    function positionChatbox(bl, bt) {
-      const layout = computeLayout(bl, bt);
-      chatbox.style.left = layout.chatLeft + "px";
-      chatbox.style.top = layout.chatTop + "px";
-      _cornerV = layout.isAbove ? "bottom" : "top";
-      _cornerH = layout.isButtonLeft ? "left" : "right";
-      updateResizeCorner();
-      return layout;
-    }
-    function updateResizeCorner() {
+    function updateResizeCorner(layout) {
       const el = document.getElementById("ai-resize-corner");
       if (!el) return;
-      resizeRV = _cornerV === "bottom" ? "top" : "bottom";
-      resizeRH = _cornerH === "right" ? "left" : "right";
+      resizeCornerVertical = layout.isAbove ? "top" : "bottom";
+      resizeCornerHorizontal = layout.isButtonLeft ? "right" : "left";
       el.style.top = el.style.bottom = el.style.left = el.style.right = "";
-      el.style[resizeRV] = "0";
-      el.style[resizeRH] = "0";
+      el.style[resizeCornerVertical] = "0";
+      el.style[resizeCornerHorizontal] = "0";
       const radiusMap = {
         tl: "8px 0 0 0",
         tr: "0 8px 0 0",
         br: "0 0 8px 0",
         bl: "0 0 0 8px"
       };
-      const key = resizeRV[0] + resizeRH[0];
+      const key = resizeCornerVertical[0] + resizeCornerHorizontal[0];
       el.setAttribute("data-corner", key);
       el.style.borderRadius = radiusMap[key] || "";
-      el.style.cursor = resizeRV === "top" === (resizeRH === "left") ? "nwse-resize" : "nesw-resize";
+      el.style.cursor = resizeCornerVertical === "top" === (resizeCornerHorizontal === "left") ? "nwse-resize" : "nesw-resize";
+    }
+    function positionChatbox(buttonLeft, buttonTop) {
+      const layout = computeLayout(buttonLeft, buttonTop);
+      chatbox.style.left = layout.chatLeft + "px";
+      chatbox.style.top = layout.chatTop + "px";
+      updateResizeCorner(layout);
+      return layout;
     }
     function applyPos(left, top) {
       const layout = positionChatbox(left, top);
       aiButton.style.left = layout.buttonLeft + "px";
       aiButton.style.top = layout.buttonTop + "px";
       return { left: layout.buttonLeft, top: layout.buttonTop };
+    }
+    function applyChatOpacity(val) {
+      chatbox.style.opacity = val;
+    }
+    function applyChatSize(width, height) {
+      const limits = getChatSizeLimits();
+      const nextWidth = clampValue(width, limits.minWidth, limits.maxWidth);
+      const nextHeight = clampValue(height, limits.minHeight, limits.maxHeight);
+      chatbox.style.minWidth = limits.minWidth + "px";
+      chatbox.style.minHeight = limits.minHeight + "px";
+      chatbox.style.maxWidth = limits.maxWidth + "px";
+      chatbox.style.width = nextWidth + "px";
+      chatbox.style.height = nextHeight + "px";
+      chatbox.style.maxHeight = nextHeight + "px";
+      return { width: nextWidth, height: nextHeight };
+    }
+    function applyButtonOpacity(val) {
+      aiButton.style.opacity = val;
     }
     function normalizeViewportState(options = {}) {
       const { left, top, persist = false } = options;
@@ -314,15 +872,6 @@
         height: appliedSize.height
       };
     }
-    loadBtnPos((initPos) => {
-      normalizeViewportState({
-        left: initPos.left,
-        top: initPos.top,
-        persist: true
-      });
-      aiButton.style.visibility = "";
-      updateDarkMode();
-    });
     function getPageLuminance() {
       const els = [document.documentElement, document.body];
       for (const el of els) {
@@ -332,22 +881,266 @@
         const [r, g, b] = m.slice(0, 3).map(Number);
         const alpha = m[3] != null ? Number(m[3]) : 1;
         if (alpha === 0) continue;
-        const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        return lum;
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
       }
       return 1;
     }
     function updateDarkMode() {
-      const lum = getPageLuminance();
-      chatbox.classList.toggle("ai-page-dark", lum < 0.5);
+      chatbox.classList.toggle("ai-page-dark", getPageLuminance() < 0.5);
     }
+    function getPageSessionKey() {
+      return `${window.location.origin}${window.location.pathname}${window.location.search}`;
+    }
+    function toggleChatbox() {
+      isOpen = !isOpen;
+      chatbox.classList.toggle("open", isOpen);
+      aiButton.classList.toggle("active", isOpen);
+      if (isOpen) {
+        normalizeViewportState({ persist: true });
+      }
+    }
+    function closeChatbox() {
+      isOpen = false;
+      chatbox.classList.remove("open");
+      aiButton.classList.remove("active");
+    }
+    function toggleSettings() {
+      settingsOpen = !settingsOpen;
+      document.getElementById("ai-settings-panel").classList.toggle("visible", settingsOpen);
+    }
+    function addMessage(text, isUser = false) {
+      const messagesContainer = chatbox.querySelector(".ai-messages");
+      const messageDiv = document.createElement("div");
+      messageDiv.className = isUser ? "ai-msg ai-msg-user" : "ai-msg ai-msg-bot";
+      if (isUser) {
+        messageDiv.textContent = text;
+      } else {
+        messageDiv.appendChild(parseMarkdown(text));
+        renderMath(messageDiv);
+      }
+      messagesContainer.appendChild(messageDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    function addLoadingIndicator() {
+      const messagesContainer = chatbox.querySelector(".ai-messages");
+      const loadingDiv = document.createElement("div");
+      loadingDiv.className = "ai-msg ai-msg-bot ai-loading";
+      loadingDiv.id = "ai-loading-indicator";
+      loadingDiv.innerHTML = '<div class="ai-typing"><span></span><span></span><span></span></div>';
+      messagesContainer.appendChild(loadingDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    function removeLoadingIndicator() {
+      const loading = document.getElementById("ai-loading-indicator");
+      if (loading) {
+        loading.remove();
+      }
+    }
+    function handleImageFile(file) {
+      if (!file.type.startsWith("image/")) {
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const base64Data = event.target.result;
+        currentImageBase64 = base64Data.split(",")[1];
+        currentImageMimeType = file.type;
+        const preview = document.getElementById("ai-image-preview");
+        const previewImg = document.getElementById("ai-preview-img");
+        previewImg.src = base64Data;
+        preview.classList.remove("hidden");
+      };
+      reader.readAsDataURL(file);
+    }
+    function removeImage() {
+      currentImageBase64 = null;
+      currentImageMimeType = null;
+      document.getElementById("ai-image-preview").classList.add("hidden");
+    }
+    async function sendToAI$1(text, imageBase64 = null, imageMimeType = null) {
+      const settings = await getApiKey();
+      return sendToAI({
+        text,
+        imageBase64,
+        imageMimeType,
+        settings,
+        normalizeOpenCodeUrl,
+        getPageSessionKey,
+        pendingRequests: pendingAPIRequests
+      });
+    }
+    async function handleSend() {
+      const input = document.getElementById("ai-chatbox-input");
+      const text = input.value.trim();
+      if (!text && !currentImageBase64) {
+        return;
+      }
+      if (text) {
+        addMessage(text, true);
+      }
+      if (currentImageBase64) {
+        addMessage("[Image attached]", true);
+      }
+      input.value = "";
+      addLoadingIndicator();
+      try {
+        const response = await sendToAI$1(
+          text,
+          currentImageBase64,
+          currentImageMimeType
+        );
+        removeLoadingIndicator();
+        addMessage(response, false);
+        removeImage();
+      } catch (error) {
+        removeLoadingIndicator();
+        addMessage("Error: " + error.message, false);
+      }
+    }
+    async function handleQuizScreenshot() {
+      addMessage("📸 Screenshot sent — answering quiz…", true);
+      addLoadingIndicator();
+      try {
+        chatbox.style.display = "none";
+        aiButton.style.display = "none";
+        await new Promise(
+          (resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))
+        );
+        let captured;
+        try {
+          captured = await new Promise((resolve, reject) => {
+            browser.runtime.sendMessage({ type: "captureTab" }, (response2) => {
+              if (browser.runtime.lastError) {
+                reject(new Error(browser.runtime.lastError.message));
+              } else if (response2 && response2.success) {
+                resolve(response2);
+              } else {
+                reject(
+                  new Error(response2 && response2.error || "Screenshot failed")
+                );
+              }
+            });
+          });
+        } finally {
+          chatbox.style.display = "";
+          aiButton.style.display = "";
+        }
+        const quizPrompt = `You are a precise quiz-answering assistant. Your only job is to find and answer the question visible in this screenshot.
+
+RULES — follow them exactly, no exceptions:
+1. Do NOT describe, summarize, or comment on the screenshot.
+2. Scan the screenshot for a question (quiz, test, exercise, form field, etc.).
+3. If NO question is found -> respond with exactly: no question found
+4. If a MULTIPLE-CHOICE or SINGLE-CHOICE question is found -> respond with ONLY the letter or number of the correct option (e.g. "B" or "3"). No explanation.
+5. If any OTHER type of question is found (fill-in, short answer, calculation, etc.) -> respond with the shortest correct answer only. No explanation, no full sentences unless the answer itself is a sentence.
+
+Begin.`;
+        const response = await sendToAI$1(
+          quizPrompt,
+          captured.base64,
+          captured.mimeType
+        );
+        removeLoadingIndicator();
+        addMessage(response, false);
+      } catch (error) {
+        removeLoadingIndicator();
+        addMessage("Error: " + error.message, false);
+      }
+    }
+    async function loadSettings() {
+      const {
+        key,
+        provider,
+        model,
+        opencodeUrl,
+        opencodePassword,
+        opacity,
+        btnOpacity,
+        chatWidth,
+        chatHeight
+      } = await getApiKey();
+      if (key) document.getElementById("ai-sync-key").value = key;
+      document.getElementById("ai-opencode-url").value = normalizeOpenCodeUrl(opencodeUrl);
+      document.getElementById("ai-opencode-password").value = opencodePassword || "";
+      const resolvedProvider = provider || "gemini";
+      document.getElementById("ai-provider-select").value = resolvedProvider;
+      updateProviderSettingsUI(resolvedProvider);
+      await populateModels(
+        resolvedProvider,
+        model,
+        {
+          opencodeUrl: normalizeOpenCodeUrl(opencodeUrl),
+          opencodePassword: opencodePassword || ""
+        },
+        opencodeModelCache
+      );
+      const pct = Math.round(opacity * 100);
+      document.getElementById("ai-opacity-slider").value = pct;
+      document.getElementById("ai-opacity-value").textContent = pct + "%";
+      applyChatOpacity(opacity);
+      const btnPct = Math.round(btnOpacity * 100);
+      document.getElementById("ai-btn-opacity-slider").value = btnPct;
+      document.getElementById("ai-btn-opacity-value").textContent = btnPct + "%";
+      applyButtonOpacity(btnOpacity);
+      const appliedSize = applyChatSize(chatWidth, chatHeight);
+      if (appliedSize.width !== chatWidth || appliedSize.height !== chatHeight) {
+        autoSave();
+      }
+      settingsLoaded = true;
+    }
+    async function autoSave() {
+      const key = document.getElementById("ai-sync-key").value.trim();
+      const provider = document.getElementById("ai-provider-select").value;
+      const model = document.getElementById("ai-model-select").value;
+      const opencodeUrl = normalizeOpenCodeUrl(
+        document.getElementById("ai-opencode-url").value
+      );
+      const opencodePassword = document.getElementById(
+        "ai-opencode-password"
+      ).value;
+      const opacity = parseInt(document.getElementById("ai-opacity-slider").value, 10) / 100;
+      const btnOp = parseInt(document.getElementById("ai-btn-opacity-slider").value, 10) / 100;
+      const chatWidth = chatbox.offsetWidth || 320;
+      const chatHeight = chatbox.offsetHeight || 480;
+      await saveApiKey(
+        key,
+        provider,
+        model,
+        opencodeUrl,
+        opencodePassword,
+        opacity,
+        btnOp,
+        chatWidth,
+        chatHeight
+      );
+    }
+    function openImagePicker() {
+      const fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.accept = "image/*";
+      fileInput.onchange = (event) => {
+        if (event.target.files.length > 0) {
+          handleImageFile(event.target.files[0]);
+        }
+      };
+      fileInput.click();
+    }
+    loadBtnPos((initPos) => {
+      normalizeViewportState({
+        left: initPos.left,
+        top: initPos.top,
+        persist: true
+      });
+      aiButton.style.visibility = "";
+      updateDarkMode();
+    });
     updateDarkMode();
-    const _darkObserver = new MutationObserver(updateDarkMode);
-    _darkObserver.observe(document.documentElement, {
+    const darkObserver = new MutationObserver(updateDarkMode);
+    darkObserver.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["class", "style", "data-theme", "data-color-scheme"]
     });
-    _darkObserver.observe(document.body, {
+    darkObserver.observe(document.body, {
       attributes: true,
       attributeFilter: ["class", "style", "data-theme", "data-color-scheme"]
     });
@@ -359,9 +1152,9 @@
       }
       for (const [key, change] of Object.entries(changes)) {
         if (key === POS_KEY || !change.newValue) continue;
-        const pending = _pendingAPIRequests.get(key);
+        const pending = pendingAPIRequests.get(key);
         if (pending) {
-          _pendingAPIRequests.delete(key);
+          pendingAPIRequests.delete(key);
           browser.storage.local.remove(key);
           const resp = change.newValue;
           if (resp.success) {
@@ -404,447 +1197,12 @@
         toggleChatbox();
       }
     });
-    const _pendingAPIRequests = /* @__PURE__ */ new Map();
-    let isOpen = false;
-    let settingsOpen = false;
-    let settingsLoaded = false;
-    let currentImageBase64 = null;
-    let currentImageMimeType = null;
-    let _settingsMinH = 354;
-    const OPENCODE_DEFAULT_URL = "http://127.0.0.1:4096";
-    let opencodeModelCache = { key: "", models: [] };
-    const PROVIDER_MODELS = {
-      gemini: [
-        {
-          value: "gemini-3.1-pro-preview",
-          label: "Gemini 3.1 Pro Preview (latest)"
-        },
-        { value: "gemini-3-flash-preview", label: "Gemini 3 Flash Preview" },
-        { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro (stable)" },
-        { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (stable)" },
-        { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite" }
-      ],
-      openai: [
-        { value: "gpt-5.2", label: "GPT-5.2 (latest)" },
-        { value: "gpt-5.2-pro", label: "GPT-5.2 Pro" },
-        { value: "gpt-5-mini", label: "GPT-5 Mini" },
-        { value: "gpt-5-nano", label: "GPT-5 Nano" },
-        { value: "gpt-4.1", label: "GPT-4.1" },
-        { value: "gpt-4o", label: "GPT-4o" }
-      ],
-      anthropic: [
-        { value: "claude-opus-4-6", label: "Claude Opus 4.6 (latest)" },
-        { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
-        { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" }
-      ],
-      openrouter: [
-        {
-          value: "google/gemini-3.1-pro-preview",
-          label: "Gemini 3.1 Pro Preview"
-        },
-        { value: "openai/gpt-5.2", label: "GPT-5.2" },
-        { value: "anthropic/claude-opus-4-6", label: "Claude Opus 4.6" },
-        { value: "anthropic/claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
-        { value: "qwen/qwen3.5-122b-a10b", label: "Qwen 3.5 122B" },
-        { value: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B" },
-        { value: "deepseek/deepseek-r1", label: "DeepSeek R1" }
-      ],
-      grok: [
-        {
-          value: "grok-4-fast-reasoning",
-          label: "Grok 4 Fast Reasoning (latest)"
-        },
-        { value: "grok-4", label: "Grok 4" },
-        { value: "grok-3", label: "Grok 3" },
-        { value: "grok-3-mini", label: "Grok 3 Mini" }
-      ]
-    };
-    function setModelOptions(models, savedModel) {
-      const modelSelect = document.getElementById("ai-model-select");
-      modelSelect.innerHTML = "";
-      models.forEach((m) => {
-        const opt = document.createElement("option");
-        opt.value = m.value;
-        opt.textContent = m.label;
-        modelSelect.appendChild(opt);
-      });
-      if (savedModel && models.some((m) => m.value === savedModel)) {
-        modelSelect.value = savedModel;
-      } else if (models.length > 0) {
-        modelSelect.value = models[0].value;
-      }
-    }
-    function normalizeOpenCodeUrl(url) {
-      const raw = (url || "").trim();
-      if (!raw) return OPENCODE_DEFAULT_URL;
-      return raw.replace(/\/$/, "");
-    }
-    function getPageSessionKey() {
-      return `${window.location.origin}${window.location.pathname}${window.location.search}`;
-    }
-    function updateProviderSettingsUI(provider) {
-      const isOpenCode = provider === "opencode";
-      document.getElementById("ai-api-key-group").classList.toggle("hidden", isOpenCode);
-      document.getElementById("ai-opencode-group").classList.toggle("hidden", !isOpenCode);
-    }
-    function fetchOpenCodeModels(opencodeConfig) {
-      return new Promise((resolve, reject) => {
-        browser.runtime.sendMessage(
-          {
-            type: "getOpenCodeModels",
-            opencodeConfig
-          },
-          (response) => {
-            if (browser.runtime.lastError) {
-              reject(new Error(browser.runtime.lastError.message));
-              return;
-            }
-            if (!response || !response.success) {
-              reject(
-                new Error(
-                  response && response.error ? response.error : "Failed to load models"
-                )
-              );
-              return;
-            }
-            resolve(response);
-          }
-        );
-      });
-    }
-    async function populateModels(provider, savedModel, settings) {
-      if (provider !== "opencode") {
-        setModelOptions(PROVIDER_MODELS[provider] || [], savedModel);
-        return;
-      }
-      const modelSelect = document.getElementById("ai-model-select");
-      const status = document.getElementById("ai-opencode-status");
-      modelSelect.innerHTML = "";
-      const loading = document.createElement("option");
-      loading.value = "";
-      loading.textContent = "Loading models...";
-      modelSelect.appendChild(loading);
-      const conf = settings || await getApiKey();
-      const opencodeConfig = {
-        baseUrl: normalizeOpenCodeUrl(conf.opencodeUrl),
-        password: conf.opencodePassword || ""
-      };
-      const cacheKey = `${opencodeConfig.baseUrl}::${opencodeConfig.password}`;
-      try {
-        let serverModels = [];
-        let defaultModel = "";
-        if (opencodeModelCache.key === cacheKey && opencodeModelCache.models.length > 0) {
-          serverModels = opencodeModelCache.models;
-        } else {
-          const data = await fetchOpenCodeModels(opencodeConfig);
-          serverModels = Array.isArray(data.models) ? data.models : [];
-          defaultModel = data.defaultModel || "";
-          opencodeModelCache = { key: cacheKey, models: serverModels };
-        }
-        const merged = [{ value: "", label: "Server default model" }].concat(
-          serverModels
-        );
-        setModelOptions(merged, savedModel || defaultModel || "");
-        status.textContent = `Connected to ${opencodeConfig.baseUrl}`;
-      } catch (error) {
-        setModelOptions([{ value: "", label: "Server default model" }], "");
-        status.textContent = `Model fetch failed: ${error.message}`;
-      }
-    }
-    function toggleChatbox() {
-      isOpen = !isOpen;
-      chatbox.classList.toggle("open", isOpen);
-      aiButton.classList.toggle("active", isOpen);
-      if (isOpen) {
-        normalizeViewportState({ persist: true });
-      }
-    }
-    function closeChatbox() {
-      isOpen = false;
-      chatbox.classList.remove("open");
-      aiButton.classList.remove("active");
-    }
-    function toggleSettings() {
-      settingsOpen = !settingsOpen;
-      document.getElementById("ai-settings-panel").classList.toggle("visible", settingsOpen);
-    }
-    let katexReady = null;
-    function loadKaTeX() {
-      if (!katexReady) katexReady = Promise.resolve();
-      return katexReady;
-    }
-    function renderMath(el) {
-      loadKaTeX().then(() => {
-        if (!window.katex) return;
-        el.querySelectorAll(".ai-math-display").forEach((span) => {
-          try {
-            katex.render(span.dataset.latex, span, {
-              displayMode: true,
-              throwOnError: false
-            });
-          } catch (e) {
-            span.textContent = span.dataset.latex;
-          }
-        });
-        el.querySelectorAll(".ai-math-inline").forEach((span) => {
-          try {
-            katex.render(span.dataset.latex, span, {
-              displayMode: false,
-              throwOnError: false
-            });
-          } catch (e) {
-            span.textContent = span.dataset.latex;
-          }
-        });
-      });
-    }
-    const ALLOWED_MARKDOWN_TAGS = /* @__PURE__ */ new Set([
-      "A",
-      "BLOCKQUOTE",
-      "BR",
-      "CODE",
-      "DEL",
-      "EM",
-      "H1",
-      "H2",
-      "H3",
-      "H4",
-      "H5",
-      "H6",
-      "HR",
-      "LI",
-      "OL",
-      "P",
-      "PRE",
-      "SPAN",
-      "STRONG",
-      "TABLE",
-      "TBODY",
-      "TD",
-      "TH",
-      "THEAD",
-      "TR",
-      "UL"
-    ]);
-    const MARKED_OPTIONS = {
-      gfm: true,
-      breaks: true,
-      headerIds: false,
-      mangle: false
-    };
-    const MARKED_API = globalThis.marked && typeof globalThis.marked.parse === "function" ? globalThis.marked : null;
-    function sanitizeMarkdownNode(node, doc) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        return doc.createTextNode(node.textContent);
-      }
-      if (node.nodeType !== Node.ELEMENT_NODE) {
-        return null;
-      }
-      if (!ALLOWED_MARKDOWN_TAGS.has(node.tagName)) {
-        const fragment = doc.createDocumentFragment();
-        Array.from(node.childNodes).forEach((child) => {
-          const sanitizedChild = sanitizeMarkdownNode(child, doc);
-          if (sanitizedChild) fragment.appendChild(sanitizedChild);
-        });
-        return fragment;
-      }
-      const el = doc.createElement(node.tagName.toLowerCase());
-      if (node.tagName === "A") {
-        const href = node.getAttribute("href") || "";
-        if (/^(https?:|mailto:)/i.test(href)) {
-          el.setAttribute("href", href);
-          el.setAttribute("target", "_blank");
-          el.setAttribute("rel", "noopener noreferrer");
-        }
-      } else if (node.tagName === "SPAN") {
-        const cls = node.getAttribute("class") || "";
-        if (cls === "ai-math-display" || cls === "ai-math-inline") {
-          el.setAttribute("class", cls);
-          const latex = node.getAttribute("data-latex");
-          if (latex != null) el.setAttribute("data-latex", latex);
-        }
-      } else if (node.tagName === "CODE") {
-        const cls = node.getAttribute("class") || "";
-        if (/^language-[a-z0-9_-]+$/i.test(cls)) {
-          el.setAttribute("class", cls);
-        }
-      } else if (node.tagName === "TH" || node.tagName === "TD") {
-        const align = node.getAttribute("align");
-        if (align && /^(left|center|right)$/i.test(align)) {
-          el.setAttribute("align", align.toLowerCase());
-        }
-      }
-      Array.from(node.childNodes).forEach((child) => {
-        const sanitizedChild = sanitizeMarkdownNode(child, doc);
-        if (sanitizedChild) el.appendChild(sanitizedChild);
-      });
-      return el;
-    }
-    function sanitizeMarkdownHtml(html) {
-      const parser = new DOMParser();
-      const parsed = parser.parseFromString(html, "text/html");
-      const fragment = document.createDocumentFragment();
-      Array.from(parsed.body.childNodes).forEach((node) => {
-        const sanitizedNode = sanitizeMarkdownNode(node, document);
-        if (sanitizedNode) fragment.appendChild(sanitizedNode);
-      });
-      return fragment;
-    }
-    function extractMath(text) {
-      const mathStore = [];
-      const stash = (latex, display) => {
-        const idx = mathStore.length;
-        mathStore.push({ latex: latex.trim(), display });
-        return `\0MATH${idx}\0`;
-      };
-      return {
-        text: text.replace(/\\\[([\s\S]*?)\\\]/g, (_, latex) => stash(latex, true)).replace(/\\\(([\s\S]*?)\\\)/g, (_, latex) => stash(latex, false)).replace(
-          /(?<!\$)\$(?!\$)([^$\n]+?)\$/g,
-          (_, latex) => stash(latex, false)
-        ).replace(/\$\$([\s\S]*?)\$\$/g, (_, latex) => stash(latex, true)),
-        mathStore
-      };
-    }
-    function renderMarkdown(text) {
-      return MARKED_API ? MARKED_API.parse(text, MARKED_OPTIONS) : `<p>${text}</p>`;
-    }
-    function restoreMath(html, mathStore) {
-      return html.replace(/\x00MATH(\d+)\x00/g, (_, i) => {
-        const { latex, display } = mathStore[+i];
-        const cls = display ? "ai-math-display" : "ai-math-inline";
-        const escaped = latex.replace(/"/g, "&quot;");
-        return `<span class="${cls}" data-latex="${escaped}"></span>`;
-      });
-    }
-    function parseMarkdown(text) {
-      const parsed = extractMath(text);
-      const html = renderMarkdown(parsed.text);
-      return sanitizeMarkdownHtml(restoreMath(html, parsed.mathStore));
-    }
-    function addMessage(text, isUser = false) {
-      const messagesContainer = chatbox.querySelector(".ai-messages");
-      const messageDiv = document.createElement("div");
-      messageDiv.className = isUser ? "ai-msg ai-msg-user" : "ai-msg ai-msg-bot";
-      if (isUser) {
-        messageDiv.textContent = text;
-      } else {
-        messageDiv.appendChild(parseMarkdown(text));
-        renderMath(messageDiv);
-      }
-      messagesContainer.appendChild(messageDiv);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-    function addLoadingIndicator() {
-      const messagesContainer = chatbox.querySelector(".ai-messages");
-      const loadingDiv = document.createElement("div");
-      loadingDiv.className = "ai-msg ai-msg-bot ai-loading";
-      loadingDiv.id = "ai-loading-indicator";
-      loadingDiv.innerHTML = `<div class="ai-typing"><span></span><span></span><span></span></div>`;
-      messagesContainer.appendChild(loadingDiv);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-    function removeLoadingIndicator() {
-      const loading = document.getElementById("ai-loading-indicator");
-      if (loading) {
-        loading.remove();
-      }
-    }
-    function handleImageFile(file) {
-      if (!file.type.startsWith("image/")) {
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const base64Data = e.target.result;
-        currentImageBase64 = base64Data.split(",")[1];
-        currentImageMimeType = file.type;
-        const preview = document.getElementById("ai-image-preview");
-        const previewImg = document.getElementById("ai-preview-img");
-        previewImg.src = base64Data;
-        preview.classList.remove("hidden");
-      };
-      reader.readAsDataURL(file);
-    }
-    function removeImage() {
-      currentImageBase64 = null;
-      currentImageMimeType = null;
-      document.getElementById("ai-image-preview").classList.add("hidden");
-    }
-    async function getApiKey() {
-      return new Promise((resolve) => {
-        browser.storage.local.get(
-          [
-            "geminiApiKey",
-            "apiProvider",
-            "apiModel",
-            "opencodeServerUrl",
-            "opencodePassword",
-            "chatOpacity",
-            "btnOpacity",
-            "chatWidth",
-            "chatHeight"
-          ],
-          (result) => {
-            resolve({
-              key: result.geminiApiKey || null,
-              provider: result.apiProvider || "gemini",
-              model: result.apiModel || null,
-              opencodeUrl: result.opencodeServerUrl || OPENCODE_DEFAULT_URL,
-              opencodePassword: result.opencodePassword || "",
-              opacity: result.chatOpacity != null ? result.chatOpacity : 0.95,
-              btnOpacity: result.btnOpacity != null ? result.btnOpacity : 0.25,
-              chatWidth: result.chatWidth != null ? result.chatWidth : 320,
-              chatHeight: result.chatHeight != null ? result.chatHeight : 480
-            });
-          }
-        );
-      });
-    }
-    async function saveApiKey(key, provider, model, opencodeUrl, opencodePassword, opacity, btnOp, chatWidth, chatHeight) {
-      return new Promise((resolve) => {
-        browser.storage.local.set(
-          {
-            geminiApiKey: key,
-            apiProvider: provider,
-            apiModel: model,
-            opencodeServerUrl: normalizeOpenCodeUrl(opencodeUrl),
-            opencodePassword: opencodePassword || "",
-            chatOpacity: opacity,
-            btnOpacity: btnOp,
-            chatWidth,
-            chatHeight
-          },
-          () => {
-            resolve();
-          }
-        );
-      });
-    }
-    function applyChatOpacity(val) {
-      chatbox.style.opacity = val;
-    }
-    function applyChatSize(w, h) {
-      const limits = getChatSizeLimits();
-      w = clampValue(w, limits.minWidth, limits.maxWidth);
-      h = clampValue(h, limits.minHeight, limits.maxHeight);
-      chatbox.style.minWidth = limits.minWidth + "px";
-      chatbox.style.minHeight = limits.minHeight + "px";
-      chatbox.style.maxWidth = limits.maxWidth + "px";
-      chatbox.style.width = w + "px";
-      chatbox.style.height = h + "px";
-      chatbox.style.maxHeight = h + "px";
-      return { width: w, height: h };
-    }
-    function applyButtonOpacity(val) {
-      aiButton.style.opacity = val;
-    }
-    let isResizing = false;
     const resizeCorner = document.getElementById("ai-resize-corner");
     resizeCorner.addEventListener("mousedown", (e) => {
       isResizing = true;
       const rect = chatbox.getBoundingClientRect();
-      resizeAnchorX = resizeRH === "left" ? rect.right : rect.left;
-      resizeAnchorY = resizeRV === "top" ? rect.bottom : rect.top;
+      resizeAnchorX = resizeCornerHorizontal === "left" ? rect.right : rect.left;
+      resizeAnchorY = resizeCornerVertical === "top" ? rect.bottom : rect.top;
       e.preventDefault();
       e.stopPropagation();
     });
@@ -854,23 +1212,23 @@
       const limits = getChatSizeLimits();
       const pointerX = e.clientX;
       const pointerY = e.clientY;
-      let newW = resizeRH === "left" ? resizeAnchorX - pointerX : pointerX - resizeAnchorX;
-      let newH = resizeRV === "top" ? resizeAnchorY - pointerY : pointerY - resizeAnchorY;
-      newW = clampValue(newW, limits.minWidth, limits.maxWidth);
-      newH = clampValue(newH, limits.minHeight, limits.maxHeight);
-      let newLeft = resizeRH === "left" ? resizeAnchorX - newW : resizeAnchorX;
-      let newTop = resizeRV === "top" ? resizeAnchorY - newH : resizeAnchorY;
+      let newWidth = resizeCornerHorizontal === "left" ? resizeAnchorX - pointerX : pointerX - resizeAnchorX;
+      let newHeight = resizeCornerVertical === "top" ? resizeAnchorY - pointerY : pointerY - resizeAnchorY;
+      newWidth = clampValue(newWidth, limits.minWidth, limits.maxWidth);
+      newHeight = clampValue(newHeight, limits.minHeight, limits.maxHeight);
+      let newLeft = resizeCornerHorizontal === "left" ? resizeAnchorX - newWidth : resizeAnchorX;
+      let newTop = resizeCornerVertical === "top" ? resizeAnchorY - newHeight : resizeAnchorY;
       newLeft = Math.max(
         viewport.left + 4,
-        Math.min(viewport.left + viewport.width - newW - 4, newLeft)
+        Math.min(viewport.left + viewport.width - newWidth - 4, newLeft)
       );
       newTop = Math.max(
         viewport.top + 4,
-        Math.min(viewport.top + viewport.height - newH - 4, newTop)
+        Math.min(viewport.top + viewport.height - newHeight - 4, newTop)
       );
-      chatbox.style.width = newW + "px";
-      chatbox.style.height = newH + "px";
-      chatbox.style.maxHeight = newH + "px";
+      chatbox.style.width = newWidth + "px";
+      chatbox.style.height = newHeight + "px";
+      chatbox.style.maxHeight = newHeight + "px";
       chatbox.style.left = newLeft + "px";
       chatbox.style.top = newTop + "px";
     });
@@ -879,7 +1237,6 @@
       isResizing = false;
       autoSave();
     });
-    let viewportNormalizeTimer = null;
     const scheduleViewportNormalize = () => {
       if (viewportNormalizeTimer) clearTimeout(viewportNormalizeTimer);
       viewportNormalizeTimer = setTimeout(() => {
@@ -890,335 +1247,14 @@
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", scheduleViewportNormalize);
     }
-    function imageFilenameForMime(mimeType) {
-      const map = {
-        "image/jpeg": "image.jpg",
-        "image/png": "image.png",
-        "image/webp": "image.webp",
-        "image/gif": "image.gif",
-        "image/bmp": "image.bmp",
-        "image/heic": "image.heic",
-        "image/heif": "image.heif"
-      };
-      return map[mimeType] || "image.bin";
-    }
-    function buildRequestBody(provider, model, text, imageBase64, imageMimeType) {
-      const instruction = "You are a helpful AI assistant. Respond using Markdown formatting where appropriate: use **bold**, *italic*, `inline code`, ```code blocks```, bullet lists, numbered lists, and headers. For short factual answers (a letter, number, or single word) just reply directly without extra markup.";
-      let userText = text ? "Question: " + text : "What is the correct answer to this question shown in the image?";
-      if (provider === "gemini") {
-        const modelId = model || "gemini-3.1-pro-preview";
-        const parts = [];
-        parts.push({ text: instruction });
-        if (imageBase64 && imageMimeType) {
-          parts.push({
-            inline_data: { mime_type: imageMimeType, data: imageBase64 }
-          });
-        }
-        parts.push({ text: userText });
-        return {
-          _geminiModel: modelId,
-          contents: [{ parts }],
-          generationConfig: {
-            temperature: 0.1,
-            topK: 1,
-            topP: 0.8,
-            maxOutputTokens: 2048
-          }
-        };
-      }
-      if (provider === "openai" || provider === "openrouter") {
-        const messages = [{ role: "system", content: instruction }];
-        const userContent = [];
-        if (imageBase64 && imageMimeType) {
-          userContent.push({
-            type: "image_url",
-            image_url: { url: `data:${imageMimeType};base64,${imageBase64}` }
-          });
-        }
-        userContent.push({ type: "text", text: userText });
-        messages.push({ role: "user", content: userContent });
-        const defaultModel = provider === "openai" ? "gpt-5.2" : "google/gemini-3.1-pro-preview";
-        return {
-          model: model || defaultModel,
-          messages,
-          temperature: 0.1,
-          max_tokens: 2048
-        };
-      }
-      if (provider === "grok") {
-        const selectedModel = model || "grok-4-fast-reasoning";
-        const messages = [{ role: "system", content: instruction }];
-        const userContent = [];
-        if (imageBase64 && imageMimeType) {
-          userContent.push({
-            type: "image_url",
-            image_url: { url: `data:${imageMimeType};base64,${imageBase64}` }
-          });
-        }
-        userContent.push({ type: "text", text: userText });
-        messages.push({ role: "user", content: userContent });
-        return {
-          model: selectedModel,
-          messages,
-          stream: false,
-          temperature: 0,
-          max_tokens: 2048
-        };
-      }
-      if (provider === "anthropic") {
-        const userContent = [];
-        if (imageBase64 && imageMimeType) {
-          userContent.push({
-            type: "image",
-            source: {
-              type: "base64",
-              media_type: imageMimeType,
-              data: imageBase64
-            }
-          });
-        }
-        userContent.push({ type: "text", text: userText });
-        return {
-          model: model || "claude-sonnet-4-6",
-          max_tokens: 2048,
-          system: instruction,
-          messages: [{ role: "user", content: userContent }]
-        };
-      }
-      if (provider === "opencode") {
-        const parts = [];
-        if (imageBase64 && imageMimeType) {
-          parts.push({
-            type: "file",
-            mime: imageMimeType,
-            filename: imageFilenameForMime(imageMimeType),
-            url: `data:${imageMimeType};base64,${imageBase64}`
-          });
-        }
-        parts.push({ type: "text", text: userText });
-        const body = {
-          system: instruction,
-          parts
-        };
-        if (model && model.includes("/")) {
-          const splitIndex = model.indexOf("/");
-          body.model = {
-            providerID: model.slice(0, splitIndex),
-            modelID: model.slice(splitIndex + 1)
-          };
-        }
-        return body;
-      }
-      return {};
-    }
-    async function sendToAI(text, imageBase64 = null, imageMimeType = null) {
-      const settings = await getApiKey();
-      const { key: apiKey, provider, model } = settings;
-      if (provider !== "opencode" && !apiKey) {
-        throw new Error("API key not configured. Click ⚙️ to set up.");
-      }
-      const requestBody = buildRequestBody(
-        provider,
-        model,
-        text,
-        imageBase64,
-        imageMimeType
-      );
-      const opencodeConfig = {
-        baseUrl: normalizeOpenCodeUrl(settings.opencodeUrl),
-        password: settings.opencodePassword || ""
-      };
-      const requestId = Math.random().toString(36).slice(2) + Date.now();
-      return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          if (_pendingAPIRequests.has(requestId)) {
-            _pendingAPIRequests.delete(requestId);
-            reject(new Error("Request timed out. Please try again."));
-          }
-        }, 18e4);
-        _pendingAPIRequests.set(requestId, {
-          resolve: (v) => {
-            clearTimeout(timeout);
-            resolve(v);
-          },
-          reject: (e) => {
-            clearTimeout(timeout);
-            reject(e);
-          }
-        });
-        browser.runtime.sendMessage(
-          {
-            type: "sendToAPI",
-            requestId,
-            apiKey,
-            requestBody,
-            provider,
-            opencodeConfig,
-            pageKey: getPageSessionKey()
-          },
-          () => {
-            if (browser.runtime.lastError) {
-              const pending = _pendingAPIRequests.get(requestId);
-              if (pending) {
-                _pendingAPIRequests.delete(requestId);
-                pending.reject(
-                  new Error(
-                    "Could not reach background script. Try reloading the page."
-                  )
-                );
-              }
-            }
-          }
-        );
-      });
-    }
-    async function handleSend() {
-      const input = document.getElementById("ai-chatbox-input");
-      const text = input.value.trim();
-      if (!text && !currentImageBase64) {
-        return;
-      }
-      if (text) {
-        addMessage(text, true);
-      }
-      if (currentImageBase64) {
-        addMessage("[Image attached]", true);
-      }
-      input.value = "";
-      addLoadingIndicator();
-      try {
-        const response = await sendToAI(
-          text,
-          currentImageBase64,
-          currentImageMimeType
-        );
-        removeLoadingIndicator();
-        addMessage(response, false);
-        removeImage();
-      } catch (error) {
-        removeLoadingIndicator();
-        addMessage("Error: " + error.message, false);
-      }
-    }
-    async function handleQuizScreenshot() {
-      addMessage("📸 Screenshot sent — answering quiz…", true);
-      addLoadingIndicator();
-      try {
-        chatbox.style.display = "none";
-        aiButton.style.display = "none";
-        await new Promise(
-          (r) => requestAnimationFrame(() => requestAnimationFrame(r))
-        );
-        let captured;
-        try {
-          captured = await new Promise((resolve, reject) => {
-            browser.runtime.sendMessage({ type: "captureTab" }, (response2) => {
-              if (browser.runtime.lastError) {
-                reject(new Error(browser.runtime.lastError.message));
-              } else if (response2 && response2.success) {
-                resolve(response2);
-              } else {
-                reject(
-                  new Error(response2 && response2.error || "Screenshot failed")
-                );
-              }
-            });
-          });
-        } finally {
-          chatbox.style.display = "";
-          aiButton.style.display = "";
-        }
-        const quizPrompt = `You are a precise quiz-answering assistant. Your only job is to find and answer the question visible in this screenshot.
-
-RULES — follow them exactly, no exceptions:
-1. Do NOT describe, summarize, or comment on the screenshot.
-2. Scan the screenshot for a question (quiz, test, exercise, form field, etc.).
-3. If NO question is found → respond with exactly: no question found
-4. If a MULTIPLE-CHOICE or SINGLE-CHOICE question is found → respond with ONLY the letter or number of the correct option (e.g. "B" or "3"). No explanation.
-5. If any OTHER type of question is found (fill-in, short answer, calculation, etc.) → respond with the shortest correct answer only. No explanation, no full sentences unless the answer itself is a sentence.
-
-Begin.`;
-        const response = await sendToAI(
-          quizPrompt,
-          captured.base64,
-          captured.mimeType
-        );
-        removeLoadingIndicator();
-        addMessage(response, false);
-      } catch (error) {
-        removeLoadingIndicator();
-        addMessage("Error: " + error.message, false);
-      }
-    }
-    async function loadSettings() {
-      const {
-        key,
-        provider,
-        model,
-        opencodeUrl,
-        opencodePassword,
-        opacity,
-        btnOpacity,
-        chatWidth,
-        chatHeight
-      } = await getApiKey();
-      if (key) document.getElementById("ai-sync-key").value = key;
-      document.getElementById("ai-opencode-url").value = normalizeOpenCodeUrl(opencodeUrl);
-      document.getElementById("ai-opencode-password").value = opencodePassword || "";
-      const resolvedProvider = provider || "gemini";
-      document.getElementById("ai-provider-select").value = resolvedProvider;
-      updateProviderSettingsUI(resolvedProvider);
-      await populateModels(resolvedProvider, model, {
-        opencodeUrl: normalizeOpenCodeUrl(opencodeUrl),
-        opencodePassword: opencodePassword || ""
-      });
-      const pct = Math.round(opacity * 100);
-      document.getElementById("ai-opacity-slider").value = pct;
-      document.getElementById("ai-opacity-value").textContent = pct + "%";
-      applyChatOpacity(opacity);
-      const btnPct = Math.round(btnOpacity * 100);
-      document.getElementById("ai-btn-opacity-slider").value = btnPct;
-      document.getElementById("ai-btn-opacity-value").textContent = btnPct + "%";
-      applyButtonOpacity(btnOpacity);
-      const appliedSize = applyChatSize(chatWidth, chatHeight);
-      if (appliedSize.width !== chatWidth || appliedSize.height !== chatHeight) {
-        autoSave();
-      }
-      settingsLoaded = true;
-    }
-    async function autoSave() {
-      const key = document.getElementById("ai-sync-key").value.trim();
-      const provider = document.getElementById("ai-provider-select").value;
-      const model = document.getElementById("ai-model-select").value;
-      const opencodeUrl = normalizeOpenCodeUrl(
-        document.getElementById("ai-opencode-url").value
-      );
-      const opencodePassword = document.getElementById(
-        "ai-opencode-password"
-      ).value;
-      const opacity = parseInt(document.getElementById("ai-opacity-slider").value) / 100;
-      const btnOp = parseInt(document.getElementById("ai-btn-opacity-slider").value) / 100;
-      const chatWidth = chatbox.offsetWidth || 320;
-      const chatHeight = chatbox.offsetHeight || 480;
-      await saveApiKey(
-        key,
-        provider,
-        model,
-        opencodeUrl,
-        opencodePassword,
-        opacity,
-        btnOp,
-        chatWidth,
-        chatHeight
-      );
-    }
     document.addEventListener("keydown", function(e) {
       if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === "KeyC") {
         const active = document.activeElement;
         const tag = active && active.tagName.toLowerCase();
         const insideChatbox = active && chatbox.contains(active);
-        if (!insideChatbox && (tag === "input" || tag === "textarea" || tag === "select" || active && active.isContentEditable))
+        if (!insideChatbox && (tag === "input" || tag === "textarea" || tag === "select" || active && active.isContentEditable)) {
           return;
+        }
         e.preventDefault();
         toggleChatbox();
       }
@@ -1228,8 +1264,9 @@ Begin.`;
         const active = document.activeElement;
         const tag = active && active.tagName.toLowerCase();
         const insideChatbox = active && chatbox.contains(active);
-        if (!insideChatbox && (tag === "input" || tag === "textarea" || tag === "select" || active && active.isContentEditable))
+        if (!insideChatbox && (tag === "input" || tag === "textarea" || tag === "select" || active && active.isContentEditable)) {
           return;
+        }
         e.preventDefault();
         handleQuizScreenshot();
       }
@@ -1239,7 +1276,7 @@ Begin.`;
     document.getElementById("ai-provider-select").addEventListener("change", async () => {
       const provider = document.getElementById("ai-provider-select").value;
       updateProviderSettingsUI(provider);
-      await populateModels(provider, null);
+      await populateModels(provider, null, null, opencodeModelCache);
       await autoSave();
     });
     document.getElementById("ai-model-select").addEventListener("change", () => autoSave());
@@ -1257,7 +1294,8 @@ Begin.`;
         await populateModels(
           "opencode",
           document.getElementById("ai-model-select").value,
-          settings
+          settings,
+          opencodeModelCache
         );
       }
     });
@@ -1274,18 +1312,19 @@ Begin.`;
         await populateModels(
           "opencode",
           document.getElementById("ai-model-select").value,
-          settings
+          settings,
+          opencodeModelCache
         );
       }
     });
     document.getElementById("ai-opacity-slider").addEventListener("input", (e) => {
-      const pct = parseInt(e.target.value);
+      const pct = parseInt(e.target.value, 10);
       document.getElementById("ai-opacity-value").textContent = pct + "%";
       applyChatOpacity(pct / 100);
       autoSave();
     });
     document.getElementById("ai-btn-opacity-slider").addEventListener("input", (e) => {
-      const pct = parseInt(e.target.value);
+      const pct = parseInt(e.target.value, 10);
       document.getElementById("ai-btn-opacity-value").textContent = pct + "%";
       applyButtonOpacity(pct / 100);
       autoSave();
@@ -1299,19 +1338,11 @@ Begin.`;
       }
     });
     document.getElementById("ai-remove-image").addEventListener("click", removeImage);
-    function openImagePicker() {
-      const fileInput = document.createElement("input");
-      fileInput.type = "file";
-      fileInput.accept = "image/*";
-      fileInput.onchange = (e) => {
-        if (e.target.files.length > 0) handleImageFile(e.target.files[0]);
-      };
-      fileInput.click();
-    }
     document.getElementById("ai-attach-image-btn").addEventListener("click", openImagePicker);
     document.getElementById("ai-image-preview").addEventListener("click", (e) => {
-      if (e.target.id === "ai-remove-image" || e.target.closest("#ai-remove-image"))
+      if (e.target.id === "ai-remove-image" || e.target.closest("#ai-remove-image")) {
         return;
+      }
       openImagePicker();
     });
     const inputArea = document.getElementById("ai-dropzone");
@@ -1349,38 +1380,18 @@ Begin.`;
         display: chatbox.style.display,
         visibility: chatbox.style.visibility
       };
-      const panPrev = panel.classList.contains("visible");
+      const panelWasVisible = panel.classList.contains("visible");
       chatbox.style.visibility = "hidden";
       chatbox.style.display = "flex";
       panel.classList.add("visible");
       const headerH = header ? header.offsetHeight : 41;
       const measured = headerH + panel.offsetHeight + 16;
-      if (measured > 100) _settingsMinH = measured;
+      if (measured > 100) settingsMinHeight = measured;
       chatbox.style.display = boxPrev.display;
       chatbox.style.visibility = boxPrev.visibility;
-      if (!panPrev) panel.classList.remove("visible");
+      if (!panelWasVisible) panel.classList.remove("visible");
     })();
     loadSettings();
     loadKaTeX();
-    browser.runtime.onMessage.addListener((msg) => {
-      if (msg.type === "quizScreenshot") {
-        handleQuizScreenshot();
-        return;
-      }
-      if (msg.type === "resetPosition") {
-        browser.storage.local.remove(POS_KEY);
-        const fallback = getDefaultButtonPos();
-        const c = clampButtonToViewport(fallback.left, fallback.top);
-        applyPos(c.left, c.top);
-        applyChatSize(320, 480);
-        applyChatOpacity(0.95);
-        document.getElementById("ai-opacity-slider").value = 95;
-        document.getElementById("ai-opacity-value").textContent = "95%";
-        applyButtonOpacity(0.25);
-        document.getElementById("ai-btn-opacity-slider").value = 25;
-        document.getElementById("ai-btn-opacity-value").textContent = "25%";
-      }
-    });
-    console.log("Quick Notes: Initialized");
   })();
 })();
