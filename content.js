@@ -525,61 +525,122 @@
         });
     }
 
-    function parseMarkdown(text) {
-        const escape = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const ALLOWED_MARKDOWN_TAGS = new Set([
+        'A', 'BLOCKQUOTE', 'BR', 'CODE', 'DEL', 'EM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+        'HR', 'LI', 'OL', 'P', 'PRE', 'SPAN', 'STRONG', 'TABLE', 'TBODY', 'TD', 'TH', 'THEAD', 'TR', 'UL'
+    ]);
+    const MARKED_OPTIONS = {
+        gfm: true,
+        breaks: true,
+        headerIds: false,
+        mangle: false
+    };
+    const MARKED_API = globalThis.marked && typeof globalThis.marked.parse === 'function'
+        ? globalThis.marked
+        : null;
 
+    function sanitizeMarkdownNode(node, doc) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            return doc.createTextNode(node.textContent);
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+            return null;
+        }
+
+        if (!ALLOWED_MARKDOWN_TAGS.has(node.tagName)) {
+            const fragment = doc.createDocumentFragment();
+            Array.from(node.childNodes).forEach((child) => {
+                const sanitizedChild = sanitizeMarkdownNode(child, doc);
+                if (sanitizedChild) fragment.appendChild(sanitizedChild);
+            });
+            return fragment;
+        }
+
+        const el = doc.createElement(node.tagName.toLowerCase());
+
+        if (node.tagName === 'A') {
+            const href = node.getAttribute('href') || '';
+            if (/^(https?:|mailto:)/i.test(href)) {
+                el.setAttribute('href', href);
+                el.setAttribute('target', '_blank');
+                el.setAttribute('rel', 'noopener noreferrer');
+            }
+        } else if (node.tagName === 'SPAN') {
+            const cls = node.getAttribute('class') || '';
+            if (cls === 'ai-math-display' || cls === 'ai-math-inline') {
+                el.setAttribute('class', cls);
+                const latex = node.getAttribute('data-latex');
+                if (latex != null) el.setAttribute('data-latex', latex);
+            }
+        } else if (node.tagName === 'CODE') {
+            const cls = node.getAttribute('class') || '';
+            if (/^language-[a-z0-9_-]+$/i.test(cls)) {
+                el.setAttribute('class', cls);
+            }
+        } else if (node.tagName === 'TH' || node.tagName === 'TD') {
+            const align = node.getAttribute('align');
+            if (align && /^(left|center|right)$/i.test(align)) {
+                el.setAttribute('align', align.toLowerCase());
+            }
+        }
+
+        Array.from(node.childNodes).forEach((child) => {
+            const sanitizedChild = sanitizeMarkdownNode(child, doc);
+            if (sanitizedChild) el.appendChild(sanitizedChild);
+        });
+
+        return el;
+    }
+
+    function sanitizeMarkdownHtml(html) {
+        const parser = new DOMParser();
+        const parsed = parser.parseFromString(html, 'text/html');
+        const fragment = document.createDocumentFragment();
+
+        Array.from(parsed.body.childNodes).forEach((node) => {
+            const sanitizedNode = sanitizeMarkdownNode(node, document);
+            if (sanitizedNode) fragment.appendChild(sanitizedNode);
+        });
+
+        return fragment;
+    }
+
+    function extractMath(text) {
         const mathStore = [];
         const stash = (latex, display) => {
             const idx = mathStore.length;
-            mathStore.push({ latex, display });
+            mathStore.push({ latex: latex.trim(), display });
             return `\x00MATH${idx}\x00`;
         };
 
-        text = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, latex) => stash(latex.trim(), true));
-        text = text.replace(/\\\(([\s\S]*?)\\\)/g, (_, latex) => stash(latex.trim(), false));
-        text = text.replace(/(?<!\$)\$(?!\$)([^$\n]+?)\$/g, (_, latex) => stash(latex.trim(), false));
-        text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, latex) => stash(latex.trim(), true));
+        return {
+            text: text
+                .replace(/\\\[([\s\S]*?)\\\]/g, (_, latex) => stash(latex, true))
+                .replace(/\\\(([\s\S]*?)\\\)/g, (_, latex) => stash(latex, false))
+                .replace(/(?<!\$)\$(?!\$)([^$\n]+?)\$/g, (_, latex) => stash(latex, false))
+                .replace(/\$\$([\s\S]*?)\$\$/g, (_, latex) => stash(latex, true)),
+            mathStore
+        };
+    }
 
-        text = text.replace(/```([\s\S]*?)```/g, (_, code) =>
-            `<pre><code>${escape(code.trim())}</code></pre>`);
+    function renderMarkdown(text) {
+        return MARKED_API ? MARKED_API.parse(text, MARKED_OPTIONS) : `<p>${text}</p>`;
+    }
 
-        text = text.replace(/`([^`]+)`/g, (_, code) =>
-            `<code>${escape(code)}</code>`);
-
-        text = text.replace(/^#{6}\s+(.+)$/gm, '<h6>$1</h6>');
-        text = text.replace(/^#{5}\s+(.+)$/gm, '<h5>$1</h5>');
-        text = text.replace(/^#{4}\s+(.+)$/gm, '<h4>$1</h4>');
-        text = text.replace(/^#{3}\s+(.+)$/gm, '<h3>$1</h3>');
-        text = text.replace(/^#{2}\s+(.+)$/gm, '<h2>$1</h2>');
-        text = text.replace(/^#{1}\s+(.+)$/gm, '<h1>$1</h1>');
-
-        text = text.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-        text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-        text = text.replace(/^---$/gm, '<hr>');
-
-        text = text.replace(/((?:^[\-\*]\s.+\n?)+)/gm, match => {
-            const items = match.trim().split('\n').map(l => `<li>${l.replace(/^[\-\*]\s/, '')}</li>`).join('');
-            return `<ul>${items}</ul>`;
-        });
-
-        text = text.replace(/((?:^\d+\.\s.+\n?)+)/gm, match => {
-            const items = match.trim().split('\n').map(l => `<li>${l.replace(/^\d+\.\s/, '')}</li>`).join('');
-            return `<ol>${items}</ol>`;
-        });
-
-        text = text.replace(/^(?!<[hup]|<ol|<pre|<hr|<li|<\/)(.*\S.*)$/gm, '<p>$1</p>');
-        text = text.replace(/(?<!>)\n(?!<)/g, '<br>');
-
-        text = text.replace(/\x00MATH(\d+)\x00/g, (_, i) => {
+    function restoreMath(html, mathStore) {
+        return html.replace(/\x00MATH(\d+)\x00/g, (_, i) => {
             const { latex, display } = mathStore[+i];
             const cls = display ? 'ai-math-display' : 'ai-math-inline';
             const escaped = latex.replace(/"/g, '&quot;');
             return `<span class="${cls}" data-latex="${escaped}"></span>`;
         });
+    }
 
-        return text;
+    function parseMarkdown(text) {
+        const parsed = extractMath(text);
+        const html = renderMarkdown(parsed.text);
+        return sanitizeMarkdownHtml(restoreMath(html, parsed.mathStore));
     }
 
     // Add message to chat
@@ -590,11 +651,7 @@
         if (isUser) {
             messageDiv.textContent = text;
         } else {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(parseMarkdown(text), 'text/html');
-            while (doc.body.firstChild) {
-                messageDiv.appendChild(doc.body.firstChild);
-            }
+            messageDiv.appendChild(parseMarkdown(text));
             renderMath(messageDiv);
         }
         messagesContainer.appendChild(messageDiv);
