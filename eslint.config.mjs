@@ -40,7 +40,7 @@ export default tseslint.config(
     }
   },
   {
-    files: ["src/content/index.ts"],
+    files: ["src/content/index.ts", "src/content/markdown.ts"],
     rules: {
       "no-control-regex": "off",
       "prefer-const": "off"
