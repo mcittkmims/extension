@@ -3,3 +3,5 @@ web-ext-artifacts/
 *.xpi
 *.zip
 .amo-upload-uuid
+node_modules/
+.vite-build/
