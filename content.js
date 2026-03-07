@@ -22,16 +22,16 @@
     const chatbox = document.createElement('div');
     chatbox.id = 'moodle-ai-chatbox';
     chatbox.innerHTML = `
-        <div class="ai-chatbox-header">
-            <span class="ai-chatbox-title">Clipboard</span>
-            <div style="display: flex; align-items: center; gap: 6px;">
-                <button class="ai-chatbox-settings-btn" id="ai-settings-toggle" title="Settings">⚙</button>
-                <button class="ai-chatbox-close" title="Close">&times;</button>
+        <header class="ai-header">
+            <span class="ai-title">Clipboard</span>
+            <div class="ai-header-actions">
+                <button class="ai-btn-icon" id="ai-settings-toggle" title="Settings">⚙</button>
+                <button class="ai-btn-icon ai-close" title="Close">&times;</button>
             </div>
-        </div>
-        <div class="ai-settings-panel" id="ai-settings-panel">
+        </header>
+        <div class="ai-settings" id="ai-settings-panel">
             <label for="ai-provider-select">Provider</label>
-            <select id="ai-provider-select" class="ai-settings-select">
+            <select id="ai-provider-select">
                 <option value="gemini">Gemini (Google)</option>
                 <option value="openai">OpenAI (GPT)</option>
                 <option value="anthropic">Anthropic (Claude)</option>
@@ -39,65 +39,54 @@
                 <option value="grok">Grok (xAI)</option>
                 <option value="opencode">OpenCode (local)</option>
             </select>
-            <label for="ai-model-select" style="margin-top:8px">Model</label>
-            <select id="ai-model-select" class="ai-settings-select"></select>
+            <label for="ai-model-select" class="mt">Model</label>
+            <select id="ai-model-select"></select>
             <div id="ai-api-key-group">
-                <label for="ai-sync-key" style="margin-top:8px">API Key</label>
+                <label for="ai-sync-key" class="mt">API Key</label>
                 <input type="password" id="ai-sync-key" placeholder="Enter API key...">
-                <div class="settings-hint">Key for the selected AI provider</div>
+                <small class="hint">Key for the selected AI provider</small>
             </div>
-            <div id="ai-opencode-group" style="display:none; margin-top:8px;">
-                <label for="ai-opencode-url">OpenCode Server URL</label>
+            <div id="ai-opencode-group" class="hidden">
+                <label for="ai-opencode-url" class="mt">OpenCode Server URL</label>
                 <input type="text" id="ai-opencode-url" placeholder="http://127.0.0.1:4096">
-                <label for="ai-opencode-password" style="margin-top:8px">Server Password (optional)</label>
+                <label for="ai-opencode-password" class="mt">Server Password (optional)</label>
                 <input type="password" id="ai-opencode-password" placeholder="OPENCODE_SERVER_PASSWORD">
-                <div class="settings-hint" id="ai-opencode-status">Models load from your OpenCode server.</div>
+                <small class="hint" id="ai-opencode-status">Models load from your OpenCode server.</small>
             </div>
-            <label for="ai-opacity-slider" style="margin-top:8px">Chat Opacity</label>
-            <div style="display:flex;align-items:center;gap:8px">
-                <input type="range" id="ai-opacity-slider" min="5" max="100" step="5" value="95" style="flex:1">
-                <span id="ai-opacity-value" style="font-size:11px;color:inherit;min-width:30px;text-align:right">95%</span>
+            <label for="ai-opacity-slider" class="mt">Chat Opacity</label>
+            <div class="slider-row">
+                <input type="range" id="ai-opacity-slider" min="5" max="100" step="5" value="95">
+                <span id="ai-opacity-value" class="slider-value">95%</span>
             </div>
-            <label for="ai-btn-opacity-slider" style="margin-top:8px">Button Opacity</label>
-            <div style="display:flex;align-items:center;gap:8px">
-                <input type="range" id="ai-btn-opacity-slider" min="5" max="100" step="5" value="60" style="flex:1">
-                <span id="ai-btn-opacity-value" style="font-size:11px;color:inherit;min-width:30px;text-align:right">60%</span>
+            <label for="ai-btn-opacity-slider" class="mt">Button Opacity</label>
+            <div class="slider-row">
+                <input type="range" id="ai-btn-opacity-slider" min="5" max="100" step="5" value="60">
+                <span id="ai-btn-opacity-value" class="slider-value">60%</span>
             </div>
         </div>
-        <div class="ai-chatbox-messages">
-        </div>
-        <div class="ai-chatbox-dropzone" id="ai-dropzone">
-            <div class="ai-dropzone-content">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                    <polyline points="21 15 16 10 5 21"></polyline>
-                </svg>
-                <p>Drop or click</p>
-            </div>
-            <div class="ai-image-preview" id="ai-image-preview" style="display: none;">
+        <div class="ai-messages"></div>
+        <div class="ai-input-area" id="ai-dropzone">
+            <div class="ai-preview hidden" id="ai-image-preview">
                 <img id="ai-preview-img" src="" alt="Preview">
-                <button class="ai-remove-image" id="ai-remove-image">&times;</button>
+                <button class="ai-preview-remove" id="ai-remove-image">&times;</button>
+            </div>
+            <div class="ai-input-row">
+                <textarea id="ai-chatbox-input" placeholder="Message or paste image..." rows="1"></textarea>
+                <button class="ai-btn" id="ai-quiz-screenshot-btn" title="Screenshot & answer quiz (Alt+Q)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                </button>
+                <button class="ai-btn ai-btn-send" id="ai-chatbox-send" title="Send">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
             </div>
         </div>
-        <div class="ai-chatbox-input-container">
-            <textarea class="ai-chatbox-input" id="ai-chatbox-input" placeholder="Add to clipboard..." rows="2"></textarea>
-            <button class="ai-chatbox-quiz-btn" id="ai-quiz-screenshot-btn" title="Screenshot & answer quiz (Alt+Q)">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                    <circle cx="12" cy="13" r="4"></circle>
-                    <polyline points="9 10 9 6 15 6 15 10" style="display:none"></polyline>
-                </svg>
-            </button>
-            <button class="ai-chatbox-send" id="ai-chatbox-send" title="Send">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                </svg>
-            </button>
-        </div>
-
-        <div class="ai-resize-corner" id="ai-resize-corner"></div>
+        <div class="ai-resize" id="ai-resize-corner"></div>
     `;
 
     // Insert elements as a floating overlay on the page
@@ -420,8 +409,8 @@
 
     function updateProviderSettingsUI(provider) {
         const isOpenCode = provider === 'opencode';
-        document.getElementById('ai-api-key-group').style.display = isOpenCode ? 'none' : 'block';
-        document.getElementById('ai-opencode-group').style.display = isOpenCode ? 'block' : 'none';
+        document.getElementById('ai-api-key-group').classList.toggle('hidden', isOpenCode);
+        document.getElementById('ai-opencode-group').classList.toggle('hidden', !isOpenCode);
     }
 
     function fetchOpenCodeModels(opencodeConfig) {
@@ -508,7 +497,7 @@
     // Toggle settings
     function toggleSettings() {
         settingsOpen = !settingsOpen;
-        document.getElementById('ai-settings-panel').classList.toggle('open', settingsOpen);
+        document.getElementById('ai-settings-panel').classList.toggle('visible', settingsOpen);
     }
 
     // Lightweight Markdown → HTML renderer
@@ -539,7 +528,6 @@
     function parseMarkdown(text) {
         const escape = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-        // Stash math blocks BEFORE any escaping so backslashes/braces survive
         const mathStore = [];
         const stash = (latex, display) => {
             const idx = mathStore.length;
@@ -547,24 +535,17 @@
             return `\x00MATH${idx}\x00`;
         };
 
-        // Display math: \[...\]
         text = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, latex) => stash(latex.trim(), true));
-        // Inline math: \(...\)
         text = text.replace(/\\\(([\s\S]*?)\\\)/g, (_, latex) => stash(latex.trim(), false));
-        // Also handle $...$ inline (but not $$)
         text = text.replace(/(?<!\$)\$(?!\$)([^$\n]+?)\$/g, (_, latex) => stash(latex.trim(), false));
-        // And $$...$$
         text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, latex) => stash(latex.trim(), true));
 
-        // Fenced code blocks
         text = text.replace(/```([\s\S]*?)```/g, (_, code) =>
             `<pre><code>${escape(code.trim())}</code></pre>`);
 
-        // Inline code
         text = text.replace(/`([^`]+)`/g, (_, code) =>
             `<code>${escape(code)}</code>`);
 
-        // Headers (most # first to avoid partial matches)
         text = text.replace(/^#{6}\s+(.+)$/gm, '<h6>$1</h6>');
         text = text.replace(/^#{5}\s+(.+)$/gm, '<h5>$1</h5>');
         text = text.replace(/^#{4}\s+(.+)$/gm, '<h4>$1</h4>');
@@ -572,33 +553,25 @@
         text = text.replace(/^#{2}\s+(.+)$/gm, '<h2>$1</h2>');
         text = text.replace(/^#{1}\s+(.+)$/gm, '<h1>$1</h1>');
 
-        // Bold + italic
         text = text.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
         text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
-        // Horizontal rule
         text = text.replace(/^---$/gm, '<hr>');
 
-        // Unordered lists
         text = text.replace(/((?:^[\-\*]\s.+\n?)+)/gm, match => {
             const items = match.trim().split('\n').map(l => `<li>${l.replace(/^[\-\*]\s/, '')}</li>`).join('');
             return `<ul>${items}</ul>`;
         });
 
-        // Ordered lists
         text = text.replace(/((?:^\d+\.\s.+\n?)+)/gm, match => {
             const items = match.trim().split('\n').map(l => `<li>${l.replace(/^\d+\.\s/, '')}</li>`).join('');
             return `<ol>${items}</ol>`;
         });
 
-        // Paragraphs
         text = text.replace(/^(?!<[hup]|<ol|<pre|<hr|<li|<\/)(.*\S.*)$/gm, '<p>$1</p>');
-
-        // Line breaks
         text = text.replace(/(?<!>)\n(?!<)/g, '<br>');
 
-        // Restore math as KaTeX placeholder spans
         text = text.replace(/\x00MATH(\d+)\x00/g, (_, i) => {
             const { latex, display } = mathStore[+i];
             const cls = display ? 'ai-math-display' : 'ai-math-inline';
@@ -611,23 +584,18 @@
 
     // Add message to chat
     function addMessage(text, isUser = false) {
-        const messagesContainer = chatbox.querySelector('.ai-chatbox-messages');
+        const messagesContainer = chatbox.querySelector('.ai-messages');
         const messageDiv = document.createElement('div');
-        messageDiv.className = `ai-message ${isUser ? 'ai-user' : 'ai-assistant'}`;
+        messageDiv.className = isUser ? 'ai-msg ai-msg-user' : 'ai-msg ai-msg-bot';
         if (isUser) {
-            const p = document.createElement('p');
-            p.textContent = text;
-            messageDiv.appendChild(p);
+            messageDiv.textContent = text;
         } else {
-            const bubble = document.createElement('div');
-            bubble.className = 'ai-markdown';
             const parser = new DOMParser();
             const doc = parser.parseFromString(parseMarkdown(text), 'text/html');
             while (doc.body.firstChild) {
-                bubble.appendChild(doc.body.firstChild);
+                messageDiv.appendChild(doc.body.firstChild);
             }
-            messageDiv.appendChild(bubble);
-            renderMath(bubble);
+            renderMath(messageDiv);
         }
         messagesContainer.appendChild(messageDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -635,11 +603,11 @@
 
     // Add loading indicator
     function addLoadingIndicator() {
-        const messagesContainer = chatbox.querySelector('.ai-chatbox-messages');
+        const messagesContainer = chatbox.querySelector('.ai-messages');
         const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'ai-message ai-assistant ai-loading';
+        loadingDiv.className = 'ai-msg ai-msg-bot ai-loading';
         loadingDiv.id = 'ai-loading-indicator';
-        loadingDiv.innerHTML = `<div class="ai-typing-indicator"><span></span><span></span><span></span></div>`;
+        loadingDiv.innerHTML = `<div class="ai-typing"><span></span><span></span><span></span></div>`;
         messagesContainer.appendChild(loadingDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
@@ -674,11 +642,9 @@
 
             const preview = document.getElementById('ai-image-preview');
             const previewImg = document.getElementById('ai-preview-img');
-            const dropzone = document.getElementById('ai-dropzone');
             
             previewImg.src = base64Data;
-            preview.style.display = 'flex';
-            dropzone.querySelector('.ai-dropzone-content').style.display = 'none';
+            preview.classList.remove('hidden');
         };
         reader.readAsDataURL(file);
     }
@@ -687,10 +653,7 @@
     function removeImage() {
         currentImageBase64 = null;
         currentImageMimeType = null;
-        const preview = document.getElementById('ai-image-preview');
-        const dropzone = document.getElementById('ai-dropzone');
-        preview.style.display = 'none';
-        dropzone.querySelector('.ai-dropzone-content').style.display = 'flex';
+        document.getElementById('ai-image-preview').classList.add('hidden');
     }
 
     // Get API key, provider and model from storage
@@ -1125,7 +1088,7 @@ Begin.`;
         }
     });
 
-    chatbox.querySelector('.ai-chatbox-close').addEventListener('click', closeChatbox);
+    chatbox.querySelector('.ai-close').addEventListener('click', closeChatbox);
 
     document.getElementById('ai-settings-toggle').addEventListener('click', toggleSettings);
 
@@ -1190,43 +1153,26 @@ Begin.`;
 
     document.getElementById('ai-remove-image').addEventListener('click', removeImage);
 
-    // Drag and drop handlers
-    const dropzone = document.getElementById('ai-dropzone');
+    // Drag and drop on input area
+    const inputArea = document.getElementById('ai-dropzone');
     
-    dropzone.addEventListener('dragover', (e) => {
+    inputArea.addEventListener('dragover', (e) => {
         e.preventDefault();
-        dropzone.classList.add('dragover');
+        inputArea.classList.add('dragover');
     });
 
-    dropzone.addEventListener('dragleave', (e) => {
+    inputArea.addEventListener('dragleave', (e) => {
         e.preventDefault();
-        dropzone.classList.remove('dragover');
+        inputArea.classList.remove('dragover');
     });
 
-    dropzone.addEventListener('drop', (e) => {
+    inputArea.addEventListener('drop', (e) => {
         e.preventDefault();
-        dropzone.classList.remove('dragover');
-        
+        inputArea.classList.remove('dragover');
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             handleImageFile(files[0]);
         }
-    });
-
-    // Click to select image
-    dropzone.addEventListener('click', (e) => {
-        if (e.target.id === 'ai-remove-image' || e.target.closest('#ai-remove-image')) {
-            return;
-        }
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = 'image/*';
-        fileInput.onchange = (e) => {
-            if (e.target.files.length > 0) {
-                handleImageFile(e.target.files[0]);
-            }
-        };
-        fileInput.click();
     });
 
     // Paste from clipboard
@@ -1251,20 +1197,18 @@ Begin.`;
     // Must temporarily show the chatbox (it's display:none), else offsetHeight = 0
     (function measureSettingsHeight() {
         const panel = document.getElementById('ai-settings-panel');
-        const header = chatbox.querySelector('.ai-chatbox-header');
+        const header = chatbox.querySelector('.ai-header');
         const boxPrev = { display: chatbox.style.display, visibility: chatbox.style.visibility };
-        const panPrev = { display: panel.style.display,   visibility: panel.style.visibility };
+        const panPrev = panel.classList.contains('visible');
         chatbox.style.visibility = 'hidden';
         chatbox.style.display    = 'flex';
-        panel.style.visibility   = 'hidden';
-        panel.style.display      = 'block';
+        panel.classList.add('visible');
         const headerH = header ? header.offsetHeight : 41;
         const measured = headerH + panel.offsetHeight + 16;
-        if (measured > 100) _settingsMinH = measured; // only override fallback if measurement is valid
+        if (measured > 100) _settingsMinH = measured;
         chatbox.style.display    = boxPrev.display;
         chatbox.style.visibility = boxPrev.visibility;
-        panel.style.display      = panPrev.display;
-        panel.style.visibility   = panPrev.visibility;
+        if (!panPrev) panel.classList.remove('visible');
     })();
 
     // Listen for reset message from popup
