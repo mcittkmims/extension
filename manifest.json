@@ -42,7 +42,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["katex/katex.min.js", "content.js"],
+      "js": ["katex/katex.min.js", "marked/marked.min.js", "content.js"],
       "css": ["styles.css", "katex/katex.min.css"],
       "run_at": "document_end"
     }
