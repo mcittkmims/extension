@@ -120,12 +120,16 @@
         browser.storage.local.set({ [POS_KEY]: { left, top } });
     }
 
-    function clamp(left, top) {
+    function clampValue(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    function clampButtonToViewport(left, top) {
         const bw = aiButton.offsetWidth  || 20;
         const bh = aiButton.offsetHeight || 20;
         return {
-            left: Math.max(4, Math.min(window.innerWidth  - bw - 4, left)),
-            top:  Math.max(4, Math.min(window.innerHeight - bh - 4, top))
+            left: clampValue(left, 4, window.innerWidth  - bw - 4),
+            top:  clampValue(top, 4, window.innerHeight - bh - 4)
         };
     }
 
@@ -136,37 +140,88 @@
     let resizeRH = 'left';
     let resizeAnchorX = 0, resizeAnchorY = 0;
 
-    function positionChatbox(bl, bt) {
+    function computeLayout(left, top) {
         const boxW = chatbox.offsetWidth  || 320;
         const boxH = chatbox.offsetHeight || 480;
         const bw = aiButton.offsetWidth  || 20;
         const bh = aiButton.offsetHeight || 20;
         const gap = 6;
+        const margin = 4;
+        const viewport = clampButtonToViewport(left, top);
+
+        if (!isOpen) {
+            const closedTop = clampValue(viewport.top + bh + gap, margin, window.innerHeight - boxH - margin);
+            const btnCenterX = viewport.left + bw / 2;
+            const isButtonLeft = btnCenterX < window.innerWidth / 2;
+            const closedLeft = isButtonLeft
+                ? clampValue(viewport.left, margin, window.innerWidth - boxW - margin)
+                : clampValue(viewport.left + bw - boxW, margin, window.innerWidth - boxW - margin);
+
+            return {
+                buttonLeft: viewport.left,
+                buttonTop: viewport.top,
+                chatLeft: closedLeft,
+                chatTop: closedTop,
+                isAbove: false,
+                isButtonLeft
+            };
+        }
+
+        let finalLeft = viewport.left;
+        let finalTop = viewport.top;
 
         // ── Vertical ──────────────────────────────────────────────────────
-        const isAbove = bt - boxH - gap >= 4;
-        let top = isAbove ? bt - boxH - gap : bt + bh + gap;
-        top = Math.min(top, window.innerHeight - boxH - 4);
-        top = Math.max(4, top);
+        const isAbove = viewport.top - boxH - gap >= margin;
+        const minTop = isAbove ? Math.max(margin, boxH + gap + margin) : margin;
+        const maxTop = isAbove
+            ? window.innerHeight - bh - margin
+            : Math.min(window.innerHeight - bh - margin, window.innerHeight - boxH - bh - gap - margin);
+        if (minTop <= maxTop) {
+            finalTop = clampValue(finalTop, minTop, maxTop);
+        }
 
         // ── Horizontal: left-align if button is in left half, otherwise right-align ──
-        const btnCenterX = bl + bw / 2;
+        const btnCenterX = viewport.left + bw / 2;
         const isButtonLeft = btnCenterX < window.innerWidth / 2;
-        let left;
-        if (isButtonLeft) {
-            left = bl; // chat extends rightward from button left edge
-        } else {
-            left = bl + bw - boxW; // chat extends leftward from button right edge
+        const minLeft = isButtonLeft ? margin : Math.max(margin, boxW - bw + margin);
+        const maxLeft = isButtonLeft
+            ? Math.min(window.innerWidth - bw - margin, window.innerWidth - boxW - margin)
+            : window.innerWidth - bw - margin;
+        if (minLeft <= maxLeft) {
+            finalLeft = clampValue(finalLeft, minLeft, maxLeft);
         }
-        left = Math.max(4, Math.min(window.innerWidth - boxW - 4, left));
 
-        chatbox.style.left = left + 'px';
-        chatbox.style.top  = top  + 'px';
+        let chatTop = isAbove ? finalTop - boxH - gap : finalTop + bh + gap;
+        chatTop = clampValue(chatTop, margin, window.innerHeight - boxH - margin);
+
+        let chatLeft;
+        if (isButtonLeft) {
+            chatLeft = finalLeft; // chat extends rightward from button left edge
+        } else {
+            chatLeft = finalLeft + bw - boxW; // chat extends leftward from button right edge
+        }
+        chatLeft = clampValue(chatLeft, margin, window.innerWidth - boxW - margin);
+
+        return {
+            buttonLeft: finalLeft,
+            buttonTop: finalTop,
+            chatLeft,
+            chatTop,
+            isAbove,
+            isButtonLeft
+        };
+    }
+
+    function positionChatbox(bl, bt) {
+        const layout = computeLayout(bl, bt);
+        chatbox.style.left = layout.chatLeft + 'px';
+        chatbox.style.top  = layout.chatTop + 'px';
 
         // Track which chatbox corner is near the button (opposite = resize corner)
-        _cornerV = isAbove ? 'bottom' : 'top';
-        _cornerH = isButtonLeft ? 'left' : 'right';
+        _cornerV = layout.isAbove ? 'bottom' : 'top';
+        _cornerH = layout.isButtonLeft ? 'left' : 'right';
         updateResizeCorner();
+        return layout;
     }
 
     function updateResizeCorner() {
@@ -185,11 +240,10 @@
     }
 
     function applyPos(left, top) {
-        const c = clamp(left, top);
-        aiButton.style.left = c.left + 'px';
-        aiButton.style.top  = c.top  + 'px';
-        positionChatbox(c.left, c.top);
-        return c;
+        const layout = positionChatbox(left, top);
+        aiButton.style.left = layout.buttonLeft + 'px';
+        aiButton.style.top  = layout.buttonTop  + 'px';
+        return { left: layout.buttonLeft, top: layout.buttonTop };
     }
 
     // Restore saved position (async — shared across all websites)
@@ -1221,7 +1275,7 @@ Begin.`;
         }
         if (msg.type === 'resetPosition') {
             browser.storage.local.remove(POS_KEY);
-            const c = clamp(window.innerWidth - 38, window.innerHeight - 38);
+            const c = clampButtonToViewport(window.innerWidth - 38, window.innerHeight - 38);
             applyPos(c.left, c.top);
             applyChatSize(320, 480);
             // Reset opacity defaults: chat 95%, button 25%
