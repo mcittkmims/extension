@@ -34,6 +34,9 @@ VERSION=$(node -p "require('./manifest.json').version")
 TAG="v${VERSION}"
 echo "▶ Publishing ${TAG}..."
 
+# ── Build runtime files ───────────────────────────────────────────────────────
+bun run build
+
 # ── Sign with AMO ─────────────────────────────────────────────────────────────
 rm -rf web-ext-artifacts
 web-ext sign \
@@ -41,7 +44,7 @@ web-ext sign \
     --api-secret "$AMO_JWT_SECRET" \
     --channel    unlisted \
     --artifacts-dir web-ext-artifacts \
-    --ignore-files "*.sh" "*.zip" "*.md" ".env" ".env.*" ".gitignore" "updates.json" "web-ext-artifacts/**" ".github/**"
+    --ignore-files "*.sh" "*.zip" "*.md" ".env" ".env.*" ".gitignore" "updates.json" "web-ext-artifacts/**" ".github/**" "node_modules/**" ".vite-build/**" "src/**" "scripts/**" "bun.lock" "package.json" "tsconfig.json" "eslint.config.mjs" ".prettierrc.json" ".prettierignore" ".editorconfig" "vite.config.ts"
 
 # Find the signed .xpi
 XPI=$(ls web-ext-artifacts/*.xpi 2>/dev/null | head -1)
