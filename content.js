@@ -204,10 +204,11 @@
         const els = [document.documentElement, document.body];
         for (const el of els) {
             const bg = window.getComputedStyle(el).backgroundColor;
-            const m = bg.match(/\d+/g);
+            const m = bg.match(/[\d.]+/g);
             if (!m || m.length < 3) continue;
-            const [r, g, b] = m.map(Number);
-            if (r === 0 && g === 0 && b === 0) continue; // transparent/unset
+            const [r, g, b] = m.slice(0, 3).map(Number);
+            const alpha = m[3] != null ? Number(m[3]) : 1;
+            if (alpha === 0) continue; // transparent/unset
             // relative luminance
             const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
             return lum;
