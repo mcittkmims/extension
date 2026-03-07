@@ -72,6 +72,11 @@
             </div>
             <div class="ai-input-row">
                 <textarea id="ai-chatbox-input" placeholder="Message or paste image..." rows="1"></textarea>
+                <button class="ai-btn" id="ai-attach-image-btn" title="Attach image">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                    </svg>
+                </button>
                 <button class="ai-btn" id="ai-quiz-screenshot-btn" title="Screenshot & answer quiz (Alt+Q)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
@@ -101,7 +106,7 @@
 
     function loadBtnPos(cb) {
         browser.storage.local.get([POS_KEY], (result) => {
-            cb(result[POS_KEY] || { left: window.innerWidth - 38, top: window.innerHeight - 38 });
+            cb(result[POS_KEY] || getDefaultButtonPos());
         });
     }
 
@@ -113,12 +118,60 @@
         return Math.max(min, Math.min(max, value));
     }
 
+    function getViewportBounds() {
+        const vv = window.visualViewport;
+        return {
+            left: Math.round(vv && vv.offsetLeft != null ? vv.offsetLeft : 0),
+            top: Math.round(vv && vv.offsetTop != null ? vv.offsetTop : 0),
+            width: Math.round(vv && vv.width ? vv.width : window.innerWidth),
+            height: Math.round(vv && vv.height ? vv.height : window.innerHeight)
+        };
+    }
+
+    function getDefaultButtonPos() {
+        const viewport = getViewportBounds();
+        return {
+            left: viewport.left + viewport.width - 38,
+            top: viewport.top + viewport.height - 38
+        };
+    }
+
     function clampButtonToViewport(left, top) {
+        const viewport = getViewportBounds();
         const bw = aiButton.offsetWidth  || 20;
         const bh = aiButton.offsetHeight || 20;
         return {
-            left: clampValue(left, 4, window.innerWidth  - bw - 4),
-            top:  clampValue(top, 4, window.innerHeight - bh - 4)
+            left: clampValue(left, viewport.left + 4, viewport.left + viewport.width  - bw - 4),
+            top:  clampValue(top, viewport.top + 4, viewport.top + viewport.height - bh - 4)
+        };
+    }
+
+    function getCurrentButtonPos() {
+        const fallback = getDefaultButtonPos();
+        return {
+            left: parseFloat(aiButton.style.left) || aiButton.offsetLeft || fallback.left,
+            top: parseFloat(aiButton.style.top) || aiButton.offsetTop || fallback.top
+        };
+    }
+
+    function getCurrentChatSize() {
+        return {
+            width: parseFloat(chatbox.style.width) || chatbox.offsetWidth || 320,
+            height: parseFloat(chatbox.style.height) || chatbox.offsetHeight || 480
+        };
+    }
+
+    function getChatSizeLimits() {
+        const viewport = getViewportBounds();
+        const availableWidth = Math.max(1, viewport.width - 8);
+        const availableHeight = Math.max(1, viewport.height - 8);
+        const minWidth = Math.min(220, availableWidth);
+        const minHeight = Math.min(_settingsMinH, availableHeight);
+        return {
+            minWidth,
+            maxWidth: Math.max(minWidth, Math.min(700, availableWidth)),
+            minHeight,
+            maxHeight: Math.max(minHeight, Math.min(700, availableHeight))
         };
     }
 
@@ -130,6 +183,7 @@
     let resizeAnchorX = 0, resizeAnchorY = 0;
 
     function computeLayout(left, top) {
+        const viewportBounds = getViewportBounds();
         const boxW = chatbox.offsetWidth  || 320;
         const boxH = chatbox.offsetHeight || 480;
         const bw = aiButton.offsetWidth  || 20;
@@ -139,12 +193,12 @@
         const viewport = clampButtonToViewport(left, top);
 
         if (!isOpen) {
-            const closedTop = clampValue(viewport.top + bh + gap, margin, window.innerHeight - boxH - margin);
+            const closedTop = clampValue(viewport.top + bh + gap, viewportBounds.top + margin, viewportBounds.top + viewportBounds.height - boxH - margin);
             const btnCenterX = viewport.left + bw / 2;
-            const isButtonLeft = btnCenterX < window.innerWidth / 2;
+            const isButtonLeft = btnCenterX < viewportBounds.left + viewportBounds.width / 2;
             const closedLeft = isButtonLeft
-                ? clampValue(viewport.left, margin, window.innerWidth - boxW - margin)
-                : clampValue(viewport.left + bw - boxW, margin, window.innerWidth - boxW - margin);
+                ? clampValue(viewport.left, viewportBounds.left + margin, viewportBounds.left + viewportBounds.width - boxW - margin)
+                : clampValue(viewport.left + bw - boxW, viewportBounds.left + margin, viewportBounds.left + viewportBounds.width - boxW - margin);
 
             return {
                 buttonLeft: viewport.left,
@@ -160,28 +214,28 @@
         let finalTop = viewport.top;
 
         // ── Vertical ──────────────────────────────────────────────────────
-        const isAbove = viewport.top - boxH - gap >= margin;
-        const minTop = isAbove ? Math.max(margin, boxH + gap + margin) : margin;
+        const isAbove = viewport.top - boxH - gap >= viewportBounds.top + margin;
+        const minTop = isAbove ? Math.max(viewportBounds.top + margin, viewportBounds.top + boxH + gap + margin) : viewportBounds.top + margin;
         const maxTop = isAbove
-            ? window.innerHeight - bh - margin
-            : Math.min(window.innerHeight - bh - margin, window.innerHeight - boxH - bh - gap - margin);
+            ? viewportBounds.top + viewportBounds.height - bh - margin
+            : Math.min(viewportBounds.top + viewportBounds.height - bh - margin, viewportBounds.top + viewportBounds.height - boxH - bh - gap - margin);
         if (minTop <= maxTop) {
             finalTop = clampValue(finalTop, minTop, maxTop);
         }
 
         // ── Horizontal: left-align if button is in left half, otherwise right-align ──
         const btnCenterX = viewport.left + bw / 2;
-        const isButtonLeft = btnCenterX < window.innerWidth / 2;
-        const minLeft = isButtonLeft ? margin : Math.max(margin, boxW - bw + margin);
+        const isButtonLeft = btnCenterX < viewportBounds.left + viewportBounds.width / 2;
+        const minLeft = isButtonLeft ? viewportBounds.left + margin : Math.max(viewportBounds.left + margin, viewportBounds.left + boxW - bw + margin);
         const maxLeft = isButtonLeft
-            ? Math.min(window.innerWidth - bw - margin, window.innerWidth - boxW - margin)
-            : window.innerWidth - bw - margin;
+            ? Math.min(viewportBounds.left + viewportBounds.width - bw - margin, viewportBounds.left + viewportBounds.width - boxW - margin)
+            : viewportBounds.left + viewportBounds.width - bw - margin;
         if (minLeft <= maxLeft) {
             finalLeft = clampValue(finalLeft, minLeft, maxLeft);
         }
 
         let chatTop = isAbove ? finalTop - boxH - gap : finalTop + bh + gap;
-        chatTop = clampValue(chatTop, margin, window.innerHeight - boxH - margin);
+        chatTop = clampValue(chatTop, viewportBounds.top + margin, viewportBounds.top + viewportBounds.height - boxH - margin);
 
         let chatLeft;
         if (isButtonLeft) {
@@ -189,7 +243,7 @@
         } else {
             chatLeft = finalLeft + bw - boxW; // chat extends leftward from button right edge
         }
-        chatLeft = clampValue(chatLeft, margin, window.innerWidth - boxW - margin);
+        chatLeft = clampValue(chatLeft, viewportBounds.left + margin, viewportBounds.left + viewportBounds.width - boxW - margin);
 
         return {
             buttonLeft: finalLeft,
@@ -235,9 +289,36 @@
         return { left: layout.buttonLeft, top: layout.buttonTop };
     }
 
+    function normalizeViewportState(options = {}) {
+        const { left, top, persist = false } = options;
+        const originalPos = {
+            left: left != null ? left : getCurrentButtonPos().left,
+            top: top != null ? top : getCurrentButtonPos().top
+        };
+        const originalSize = getCurrentChatSize();
+        const appliedSize = applyChatSize(originalSize.width, originalSize.height);
+        const appliedPos = applyPos(originalPos.left, originalPos.top);
+        const positionChanged = appliedPos.left !== originalPos.left || appliedPos.top !== originalPos.top;
+        const sizeChanged = appliedSize.width !== originalSize.width || appliedSize.height !== originalSize.height;
+
+        if (persist) {
+            if (positionChanged) saveBtnPos(appliedPos.left, appliedPos.top);
+            if (sizeChanged && settingsLoaded) autoSave();
+        }
+
+        return {
+            positionChanged,
+            sizeChanged,
+            left: appliedPos.left,
+            top: appliedPos.top,
+            width: appliedSize.width,
+            height: appliedSize.height
+        };
+    }
+
     // Restore saved position (async — shared across all websites)
     loadBtnPos((initPos) => {
-        applyPos(initPos.left, initPos.top);
+        normalizeViewportState({ left: initPos.left, top: initPos.top, persist: true });
         aiButton.style.visibility = '';
         updateDarkMode();
     });
@@ -276,7 +357,7 @@
 
         if (changes[POS_KEY] && !isDragging) {
             const pos = changes[POS_KEY].newValue;
-            if (pos) applyPos(pos.left, pos.top);
+            if (pos) normalizeViewportState({ left: pos.left, top: pos.top });
         }
 
         for (const [key, change] of Object.entries(changes)) {
@@ -335,6 +416,7 @@
     const _pendingAPIRequests = new Map(); // requestId -> { resolve, reject }
     let isOpen = false;
     let settingsOpen = false;
+    let settingsLoaded = false;
     let currentImageBase64 = null;
     let currentImageMimeType = null;
     let currentProvider = 'gemini';
@@ -482,8 +564,7 @@
         chatbox.classList.toggle('open', isOpen);
         aiButton.classList.toggle('active', isOpen);
         if (isOpen) {
-            const r = aiButton.getBoundingClientRect();
-            positionChatbox(r.left, r.top);
+            normalizeViewportState({ persist: true });
         }
     }
 
@@ -767,11 +848,16 @@
     }
 
     function applyChatSize(w, h) {
-        w = Math.max(220, Math.min(700, w));
-        h = Math.max(_settingsMinH, Math.min(700, h));
+        const limits = getChatSizeLimits();
+        w = clampValue(w, limits.minWidth, limits.maxWidth);
+        h = clampValue(h, limits.minHeight, limits.maxHeight);
+        chatbox.style.minWidth = limits.minWidth + 'px';
+        chatbox.style.minHeight = limits.minHeight + 'px';
+        chatbox.style.maxWidth = limits.maxWidth + 'px';
         chatbox.style.width = w + 'px';
         chatbox.style.height = h + 'px';
         chatbox.style.maxHeight = h + 'px';
+        return { width: w, height: h };
     }
 
     let currentBtnOpacity = 0.25;
@@ -787,7 +873,9 @@
     resizeCorner.addEventListener('mousedown', (e) => {
         isResizing = true;
         const rect = chatbox.getBoundingClientRect();
-        // Anchor = the corner OPPOSITE to the resize handle; stays fixed during drag
+        // Anchor = the corner OPPOSITE to the resize handle; stays fixed during drag.
+        // getBoundingClientRect() and clientX/Y are both viewport-relative (same frame
+        // as style.left/top for position:fixed), so no viewport offset adjustment needed.
         resizeAnchorX = resizeRH === 'left' ? rect.right  : rect.left;
         resizeAnchorY = resizeRV === 'top'  ? rect.bottom : rect.top;
         e.preventDefault();
@@ -796,17 +884,23 @@
 
     document.addEventListener('mousemove', (e) => {
         if (!isResizing) return;
-        let newW = resizeRH === 'left' ? resizeAnchorX - e.clientX : e.clientX - resizeAnchorX;
-        let newH = resizeRV === 'top'  ? resizeAnchorY - e.clientY : e.clientY - resizeAnchorY;
-        newW = Math.max(220, Math.min(700, newW));
-        newH = Math.max(_settingsMinH, Math.min(700, newH));
+        const viewport = getViewportBounds();
+        const limits = getChatSizeLimits();
+        // clientX/Y is viewport-relative — matches resizeAnchorX/Y directly
+        const pointerX = e.clientX;
+        const pointerY = e.clientY;
+        let newW = resizeRH === 'left' ? resizeAnchorX - pointerX : pointerX - resizeAnchorX;
+        let newH = resizeRV === 'top'  ? resizeAnchorY - pointerY : pointerY - resizeAnchorY;
+        newW = clampValue(newW, limits.minWidth, limits.maxWidth);
+        newH = clampValue(newH, limits.minHeight, limits.maxHeight);
 
         let newLeft = resizeRH === 'left' ? resizeAnchorX - newW : resizeAnchorX;
         let newTop  = resizeRV === 'top'  ? resizeAnchorY - newH : resizeAnchorY;
 
-        // Clamp position so the chat box stays fully on screen
-        newLeft = Math.max(4, Math.min(window.innerWidth  - newW - 4, newLeft));
-        newTop  = Math.max(4, Math.min(window.innerHeight - newH - 4, newTop));
+        // Clamp position so the chat box stays fully within the visible viewport.
+        // viewport.left/top offsets keep this correct under pinch-zoom / visual viewport shifts.
+        newLeft = Math.max(viewport.left + 4, Math.min(viewport.left + viewport.width  - newW - 4, newLeft));
+        newTop  = Math.max(viewport.top + 4, Math.min(viewport.top + viewport.height - newH - 4, newTop));
 
         chatbox.style.width     = newW + 'px';
         chatbox.style.height    = newH + 'px';
@@ -820,6 +914,19 @@
         isResizing = false;
         autoSave();
     });
+
+    let viewportNormalizeTimer = null;
+    const scheduleViewportNormalize = () => {
+        if (viewportNormalizeTimer) clearTimeout(viewportNormalizeTimer);
+        viewportNormalizeTimer = setTimeout(() => {
+            normalizeViewportState({ persist: true });
+        }, 120);
+    };
+
+    window.addEventListener('resize', scheduleViewportNormalize);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', scheduleViewportNormalize);
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     function imageFilenameForMime(mimeType) {
@@ -1099,7 +1206,11 @@ Begin.`;
         document.getElementById('ai-btn-opacity-value').textContent = btnPct + '%';
         applyButtonOpacity(btnOpacity);
 
-        applyChatSize(chatWidth, chatHeight);
+        const appliedSize = applyChatSize(chatWidth, chatHeight);
+        if (appliedSize.width !== chatWidth || appliedSize.height !== chatHeight) {
+            autoSave();
+        }
+        settingsLoaded = true;
     }
 
     async function autoSave() {
@@ -1210,6 +1321,22 @@ Begin.`;
 
     document.getElementById('ai-remove-image').addEventListener('click', removeImage);
 
+    // Click to select image (attach button or click on existing preview to replace)
+    function openImagePicker() {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.onchange = (e) => {
+            if (e.target.files.length > 0) handleImageFile(e.target.files[0]);
+        };
+        fileInput.click();
+    }
+    document.getElementById('ai-attach-image-btn').addEventListener('click', openImagePicker);
+    document.getElementById('ai-image-preview').addEventListener('click', (e) => {
+        if (e.target.id === 'ai-remove-image' || e.target.closest('#ai-remove-image')) return;
+        openImagePicker();
+    });
+
     // Drag and drop on input area
     const inputArea = document.getElementById('ai-dropzone');
     
@@ -1246,10 +1373,6 @@ Begin.`;
         }
     });
 
-    // Load settings on init
-    loadSettings();
-    loadKaTeX();
-
     // Measure settings panel height once so min height is always at least that tall
     // Must temporarily show the chatbox (it's display:none), else offsetHeight = 0
     (function measureSettingsHeight() {
@@ -1268,6 +1391,10 @@ Begin.`;
         if (!panPrev) panel.classList.remove('visible');
     })();
 
+    // Load settings on init
+    loadSettings();
+    loadKaTeX();
+
     // Listen for reset message from popup
     browser.runtime.onMessage.addListener((msg) => {
         if (msg.type === 'quizScreenshot') {
@@ -1276,7 +1403,8 @@ Begin.`;
         }
         if (msg.type === 'resetPosition') {
             browser.storage.local.remove(POS_KEY);
-            const c = clampButtonToViewport(window.innerWidth - 38, window.innerHeight - 38);
+            const fallback = getDefaultButtonPos();
+            const c = clampButtonToViewport(fallback.left, fallback.top);
             applyPos(c.left, c.top);
             applyChatSize(320, 480);
             // Reset opacity defaults: chat 95%, button 25%
