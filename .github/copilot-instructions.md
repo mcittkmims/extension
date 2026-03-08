@@ -6,7 +6,7 @@ When the user says **publish** (or "release", "ship it", etc.), do the following
 
 ### 1. Bump the version
 Ask the user for the new version number if they haven't provided one.
-Update `"version"` in `manifest.json` to the new value.
+Update `"version"` in `public/manifest.json` to the new value.
 
 ### 2. Run the publish script
 Run in the terminal:
@@ -17,9 +17,10 @@ bash publish.sh
 **Important:** After running the script, wait silently for it to fully complete. Do NOT interrupt, check on it, or run any other commands until the script exits on its own. The AMO signing step can take several minutes.
 
 This script will automatically:
+- Build the extension into `dist/`
 - Sign the extension via the AMO API (`web-ext sign`)
 - Update `updates.json` with the new version and download URL
-- Commit and push `manifest.json` + `updates.json` to GitHub
+- Commit and push `public/manifest.json` + `updates.json` to GitHub
 - Create a GitHub Release tagged `v{version}` and upload the signed `extension.xpi`
 
 ### Prerequisites (one-time setup, remind the user if not done)

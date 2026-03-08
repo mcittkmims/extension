@@ -378,11 +378,11 @@
 .ai-typing {
   display: flex;
   gap: 4px;
-  padding: 8px 10px;
-  background: #fff;
-  border-radius: 4px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
   width: fit-content;
-  border: 1px solid #dee2e6;
+  border: none;
 }
 .ai-typing span {
   width: 6px;

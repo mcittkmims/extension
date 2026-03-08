@@ -23,7 +23,13 @@ export function bindRuntimeEvents({
   };
 
   window.addEventListener("resize", scheduleViewportNormalize);
+  window.addEventListener("scroll", scheduleViewportNormalize, {
+    passive: true
+  });
   window.visualViewport?.addEventListener("resize", scheduleViewportNormalize);
+  window.visualViewport?.addEventListener("scroll", scheduleViewportNormalize, {
+    passive: true
+  });
 
   document.addEventListener("keydown", (event) => {
     if (

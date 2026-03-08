@@ -80,6 +80,10 @@ export function bindDragEvents({
 
     const viewport = layout.getViewportBounds();
     const limits = layout.getChatSizeLimits();
+    const minLeft = viewport.left + 4;
+    const maxRight = viewport.left + viewport.width - 4;
+    const minTop = viewport.top + 4;
+    const maxBottom = viewport.top + viewport.height - 4;
     const pointerX = event.clientX;
     const pointerY = event.clientY;
     let newWidth =
@@ -91,11 +95,25 @@ export function bindDragEvents({
         ? state.resizeAnchorY - pointerY
         : pointerY - state.resizeAnchorY;
 
-    newWidth = Math.max(limits.minWidth, Math.min(limits.maxWidth, newWidth));
-    newHeight = Math.max(
-      limits.minHeight,
-      Math.min(limits.maxHeight, newHeight)
+    const maxWidthWithinViewport =
+      state.resizeCornerHorizontal === "left"
+        ? state.resizeAnchorX - minLeft
+        : maxRight - state.resizeAnchorX;
+    const maxHeightWithinViewport =
+      state.resizeCornerVertical === "top"
+        ? state.resizeAnchorY - minTop
+        : maxBottom - state.resizeAnchorY;
+    const maxWidth = Math.max(
+      limits.minWidth,
+      Math.min(limits.maxWidth, maxWidthWithinViewport)
     );
+    const maxHeight = Math.max(
+      limits.minHeight,
+      Math.min(limits.maxHeight, maxHeightWithinViewport)
+    );
+
+    newWidth = Math.max(limits.minWidth, Math.min(maxWidth, newWidth));
+    newHeight = Math.max(limits.minHeight, Math.min(maxHeight, newHeight));
 
     let newLeft =
       state.resizeCornerHorizontal === "left"
@@ -106,14 +124,8 @@ export function bindDragEvents({
         ? state.resizeAnchorY - newHeight
         : state.resizeAnchorY;
 
-    newLeft = Math.max(
-      viewport.left + 4,
-      Math.min(viewport.left + viewport.width - newWidth - 4, newLeft)
-    );
-    newTop = Math.max(
-      viewport.top + 4,
-      Math.min(viewport.top + viewport.height - newHeight - 4, newTop)
-    );
+    newLeft = Math.max(minLeft, Math.min(maxRight - newWidth, newLeft));
+    newTop = Math.max(minTop, Math.min(maxBottom - newHeight, newTop));
 
     chatbox.style.width = `${newWidth}px`;
     chatbox.style.height = `${newHeight}px`;
