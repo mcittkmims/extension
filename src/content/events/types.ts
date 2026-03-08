@@ -8,6 +8,7 @@ export interface EventBindingsOptions {
     toggle: () => void;
     close: () => void;
     send: () => Promise<void>;
+    reset: () => Promise<void>;
     runQuizScreenshot: () => Promise<void>;
   };
   settings: {

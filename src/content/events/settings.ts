@@ -95,6 +95,12 @@ export function bindSettingsEvents({
       void chat.runQuizScreenshot();
     }
   );
+  getById<HTMLButtonElement>("ai-chatbox-reset").addEventListener(
+    "click",
+    () => {
+      void chat.reset();
+    }
+  );
   chatboxInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();

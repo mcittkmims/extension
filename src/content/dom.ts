@@ -56,27 +56,36 @@ export function createOverlay() {
         </div>
         <div class="ai-messages"></div>
         <div class="ai-input-area" id="ai-dropzone">
+            <div class="ai-composer-meta">
+                <span class="ai-provider-chip" id="ai-provider-chip">Gemini</span>
+                <span class="ai-provider-status" id="ai-provider-status">Ready.</span>
+            </div>
             <div class="ai-preview hidden" id="ai-image-preview">
                 <img id="ai-preview-img" src="" alt="Preview">
                 <button class="ai-preview-remove" id="ai-remove-image">&times;</button>
             </div>
             <div class="ai-input-row">
-                <textarea id="ai-chatbox-input" placeholder="Message or paste image..." rows="1"></textarea>
+                <textarea id="ai-chatbox-input" placeholder="Ask Gemini or paste an image..." rows="1"></textarea>
                 <button class="ai-btn" id="ai-attach-image-btn" title="Attach image">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
                     </svg>
                 </button>
-                <button class="ai-btn" id="ai-quiz-screenshot-btn" title="Screenshot & answer quiz (Alt+Q)">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                        <circle cx="12" cy="13" r="4"></circle>
-                    </svg>
-                </button>
-                <button class="ai-btn ai-btn-send" id="ai-chatbox-send" title="Send">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                 <button class="ai-btn" id="ai-quiz-screenshot-btn" title="Screenshot & answer quiz (Alt+Q)">
+                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                         <circle cx="12" cy="13" r="4"></circle>
+                     </svg>
+                 </button>
+                 <button class="ai-btn ai-btn-reset" id="ai-chatbox-reset" title="Reset conversation (/reset)" aria-label="Reset conversation">
+                     <svg viewBox="0 0 16 16" aria-hidden="true">
+                         <path d="M8 16c3.314 0 6 -2 6 -5.5 0 -1.5 -0.5 -4 -2.5 -6 0.25 1.5 -1.25 2 -1.25 2C11 4 9 0.5 6 0c0.357 2 0.5 4 -2 6 -1.25 1 -2 2.729 -2 4.5C2 14 4.686 16 8 16m0 -1c-1.657 0 -3 -1 -3 -2.75 0 -0.75 0.25 -2 1.25 -3C6.125 10 7 10.5 7 10.5c-0.375 -1.25 0.5 -3.25 2 -3.5 -0.179 1 -0.25 2 1 3 0.625 0.5 1 1.364 1 2.25C11 14 9.657 15 8 15"></path>
+                     </svg>
+                 </button>
+                 <button class="ai-btn ai-btn-send" id="ai-chatbox-send" title="Send">
+                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                         <line x1="22" y1="2" x2="11" y2="13"></line>
+                         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                     </svg>
                 </button>
             </div>

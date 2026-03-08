@@ -1,4 +1,9 @@
-import { OPENCODE_DEFAULT_URL, PROVIDER_MODELS } from "./constants";
+import {
+  OPENCODE_DEFAULT_URL,
+  PROVIDER_MODELS,
+  getProviderLabel,
+  getProviderPlaceholder
+} from "./constants";
 import type { LayoutController } from "./layout";
 import type {
   OverlayElements,
@@ -13,6 +18,67 @@ import { getById } from "./utils";
 import { normalizeOpenCodeUrl } from "../shared/opencode";
 
 export { normalizeOpenCodeUrl } from "../shared/opencode";
+
+export interface SelectedProviderInfo {
+  provider: string;
+  providerLabel: string;
+  model: string | null;
+  modelLabel: string;
+  badgeLabel: string;
+  signature: string;
+}
+
+function shortenModelLabel(label: string): string {
+  const trimmed = label
+    .replace(/\s*\((latest|stable)\)\s*/gi, "")
+    .replace(/\s*Preview\s*/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (trimmed.length <= 24) {
+    return trimmed;
+  }
+
+  const slashIndex = trimmed.lastIndexOf("/");
+  if (slashIndex >= 0 && slashIndex < trimmed.length - 1) {
+    return trimmed.slice(slashIndex + 1);
+  }
+
+  return `${trimmed.slice(0, 21).trimEnd()}...`;
+}
+
+function getSelectedModelLabel(): string {
+  const modelSelect = getById<HTMLSelectElement>("ai-model-select");
+  const selectedOption = modelSelect.selectedOptions[0];
+  return selectedOption?.textContent?.trim() || "Default model";
+}
+
+export function getSelectedProviderInfo(): SelectedProviderInfo {
+  const provider = getById<HTMLSelectElement>("ai-provider-select").value;
+  const model = getById<HTMLSelectElement>("ai-model-select").value || null;
+  const providerLabel = getProviderLabel(provider);
+  const modelLabel = getSelectedModelLabel();
+
+  return {
+    provider,
+    providerLabel,
+    model,
+    modelLabel,
+    badgeLabel: shortenModelLabel(modelLabel),
+    signature: `${provider}::${model || ""}`
+  };
+}
+
+export function updateComposerMetaUI(): void {
+  const info = getSelectedProviderInfo();
+  const chip = getById<HTMLSpanElement>("ai-provider-chip");
+  const status = getById<HTMLSpanElement>("ai-provider-status");
+  const input = getById<HTMLTextAreaElement>("ai-chatbox-input");
+
+  chip.textContent = info.providerLabel;
+  input.placeholder = getProviderPlaceholder(info.provider);
+  status.textContent = info.modelLabel;
+}
 
 export function setModelOptions(
   models: ModelOption[],
@@ -31,6 +97,8 @@ export function setModelOptions(
   } else if (models.length > 0) {
     modelSelect.value = models[0].value;
   }
+
+  updateComposerMetaUI();
 }
 
 export function updateProviderSettingsUI(provider: string): void {
@@ -204,6 +272,7 @@ export function createSettingsController({
       chatbox.offsetWidth || 320,
       chatbox.offsetHeight || 480
     );
+    updateComposerMetaUI();
   }
 
   async function load(): Promise<void> {
@@ -248,6 +317,7 @@ export function createSettingsController({
     ) {
       await autoSave();
     }
+    updateComposerMetaUI();
     state.settingsLoaded = true;
   }
 

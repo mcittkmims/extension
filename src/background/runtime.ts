@@ -5,7 +5,11 @@ import {
   callOpenAI,
   callOpenRouter
 } from "./providers";
-import { callOpenCode, getOpenCodeModels } from "./opencode";
+import {
+  callOpenCode,
+  getOpenCodeModels,
+  restartOpenCodeSession
+} from "./opencode";
 
 interface RuntimeRequest {
   type: string;
@@ -35,6 +39,15 @@ export function setupRuntimeMessages(): void {
           models: data.models,
           defaultModel: data.defaultModel || ""
         }))
+        .catch((error: unknown) => ({
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }));
+    }
+
+    if (request.type === "restartOpenCodeSession") {
+      return restartOpenCodeSession(request.pageKey)
+        .then(() => ({ success: true }))
         .catch((error: unknown) => ({
           success: false,
           error: error instanceof Error ? error.message : String(error)

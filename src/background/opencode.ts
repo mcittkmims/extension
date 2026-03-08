@@ -304,6 +304,12 @@ export async function callOpenCode(
   return text;
 }
 
+export async function restartOpenCodeSession(
+  pageKey: string | undefined
+): Promise<void> {
+  await clearOpenCodeSessionId(pageKey || "default");
+}
+
 export async function getOpenCodeModels(
   opencodeConfig: OpenCodeConfig | undefined
 ): Promise<{ models: OpenCodeModelOption[]; defaultModel: string }> {

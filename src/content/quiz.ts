@@ -15,6 +15,12 @@ Begin.`;
 interface QuizControllerOptions {
   elements: OverlayElements;
   messages: MessageController;
+  beforeSend: () => Promise<{
+    providerLabel: string;
+    modelLabel: string;
+    badgeLabel: string;
+    signature: string;
+  }>;
   sendToAI: (
     text: string,
     imageBase64?: string | null,
@@ -26,6 +32,7 @@ interface QuizControllerOptions {
 export function createQuizController({
   elements,
   messages,
+  beforeSend,
   sendToAI,
   captureTab
 }: QuizControllerOptions) {
@@ -33,6 +40,8 @@ export function createQuizController({
 
   return {
     async runScreenshotQuiz(): Promise<void> {
+      const context = await beforeSend();
+      messages.ensureProviderContext(context);
       messages.addUserMessage("📸 Screenshot sent — answering quiz…");
       messages.showLoading();
 
@@ -61,7 +70,10 @@ export function createQuizController({
           captured.mimeType
         );
         messages.hideLoading();
-        messages.addBotMessage(response);
+        messages.addBotMessage(response, {
+          providerLabel: context.providerLabel,
+          modelLabel: context.badgeLabel
+        });
       } catch (error) {
         messages.hideLoading();
         messages.showError(error);

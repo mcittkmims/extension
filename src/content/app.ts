@@ -13,21 +13,24 @@ import {
   setupPendingRequestRuntime
 } from "./runtime";
 import { createOverlayState } from "./state";
-import { createSettingsController, getApiKey } from "./settings";
+import {
+  createSettingsController,
+  getApiKey,
+  getSelectedProviderInfo,
+  updateComposerMetaUI
+} from "./settings";
 import { createOverlayController } from "./overlay";
 import { createThemeController } from "./theme";
 import type { PendingRequest } from "./types";
 
 const POSITION_STORAGE_KEY = "ai_btn_pos";
-
-function getPageSessionKey(): string {
-  return `${window.location.origin}${window.location.pathname}${window.location.search}`;
-}
+const CHAT_HISTORY_STORAGE_KEY = "aiGlobalChatHistory";
+const SESSION_SCOPE_KEY = "global";
 
 export async function startContentApp(): Promise<void> {
   const elements = createOverlay();
   const { aiButton, chatbox } = elements;
-  const messages = createMessageController(chatbox);
+  const messages = createMessageController(chatbox, CHAT_HISTORY_STORAGE_KEY);
   const theme = createThemeController(chatbox);
   const pendingRequests = new Map<string, PendingRequest>();
   const state = createOverlayState();
@@ -45,9 +48,29 @@ export async function startContentApp(): Promise<void> {
       imageBase64,
       imageMimeType,
       settings,
-      getPageSessionKey,
+      getPageSessionKey: () => SESSION_SCOPE_KEY,
       pendingRequests
     });
+  }
+
+  async function beforeSend() {
+    updateComposerMetaUI();
+    return getSelectedProviderInfo();
+  }
+
+  async function resetConversation(): Promise<void> {
+    pendingRequests.forEach((pending, requestId) => {
+      pending.reject(new Error("Conversation reset."));
+      pendingRequests.delete(requestId);
+    });
+
+    await Promise.all([
+      messages.clear(),
+      browser.runtime.sendMessage({
+        type: "restartOpenCodeSession",
+        pageKey: SESSION_SCOPE_KEY
+      })
+    ]);
   }
 
   const settings = createSettingsController({
@@ -74,12 +97,15 @@ export async function startContentApp(): Promise<void> {
   const chatController = createChatController({
     messages,
     image,
-    sendToAI
+    beforeSend,
+    sendToAI,
+    resetConversation
   });
 
   const quiz = createQuizController({
     elements,
     messages,
+    beforeSend,
     sendToAI,
     captureTab: () => browser.runtime.sendMessage({ type: "captureTab" })
   });
@@ -118,6 +144,7 @@ export async function startContentApp(): Promise<void> {
       toggle: overlay.toggleChatbox,
       close: overlay.closeChatbox,
       send: chatController.send,
+      reset: chatController.reset,
       runQuizScreenshot: quiz.runScreenshotQuiz
     },
     settings: {
@@ -142,5 +169,6 @@ export async function startContentApp(): Promise<void> {
 
   settings.measurePanelHeight();
   theme.updateDarkMode();
+  await messages.loadHistory();
   await Promise.all([settings.load(), loadKaTeX()]);
 }
