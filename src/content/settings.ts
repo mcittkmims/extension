@@ -166,15 +166,14 @@ export async function saveApiKey(
 interface SettingsControllerOptions {
   elements: OverlayElements;
   state: OverlayState;
-  layout: Pick<LayoutController, "applyChatSize">;
 }
 
 export function createSettingsController({
   elements,
-  state,
-  layout
+  state
 }: SettingsControllerOptions) {
   const { aiButton, chatbox } = elements;
+  let layoutController: Pick<LayoutController, "applyChatSize"> | null = null;
 
   async function updateProviderModels(
     provider: string,
@@ -208,6 +207,10 @@ export function createSettingsController({
   }
 
   async function load(): Promise<void> {
+    if (!layoutController) {
+      throw new Error("Settings layout controller has not been attached.");
+    }
+
     const settings = await getApiKey();
     if (settings.key) {
       getById<HTMLInputElement>("ai-sync-key").value = settings.key;
@@ -235,7 +238,7 @@ export function createSettingsController({
     getById<HTMLSpanElement>("ai-btn-opacity-value").textContent = `${btnPct}%`;
     aiButton.style.opacity = String(settings.btnOpacity);
 
-    const appliedSize = layout.applyChatSize(
+    const appliedSize = layoutController.applyChatSize(
       settings.chatWidth,
       settings.chatHeight
     );
@@ -272,6 +275,9 @@ export function createSettingsController({
   }
 
   return {
+    attachLayout(layout: Pick<LayoutController, "applyChatSize">) {
+      layoutController = layout;
+    },
     updateProviderModels,
     load,
     autoSave,

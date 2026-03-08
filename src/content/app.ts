@@ -1,3 +1,4 @@
+import { createChatController } from "./chat";
 import { createOverlay } from "./dom";
 import { bindOverlayEvents } from "./events";
 import { createImageController } from "./images";
@@ -17,9 +18,9 @@ import {
   getApiKey,
   normalizeOpenCodeUrl
 } from "./settings";
+import { createOverlayController } from "./overlay";
 import { createThemeController } from "./theme";
 import type { PendingRequest } from "./types";
-import { getById } from "./utils";
 
 const POSITION_STORAGE_KEY = "ai_btn_pos";
 
@@ -54,75 +55,31 @@ export async function startContentApp(): Promise<void> {
     });
   }
 
-  function toggleChatbox(): void {
-    state.isOpen = !state.isOpen;
-    chatbox.classList.toggle("open", state.isOpen);
-    aiButton.classList.toggle("active", state.isOpen);
-    if (state.isOpen) {
-      layout.normalizeViewportState({ persist: true });
-    }
-  }
-
-  function closeChatbox(): void {
-    state.isOpen = false;
-    chatbox.classList.remove("open");
-    aiButton.classList.remove("active");
-  }
-
-  function toggleSettings(): void {
-    state.settingsOpen = !state.settingsOpen;
-    getById<HTMLDivElement>("ai-settings-panel").classList.toggle(
-      "visible",
-      state.settingsOpen
-    );
-  }
-
   const settings = createSettingsController({
     elements,
-    state,
-    layout: {
-      applyChatSize(width: number, height: number) {
-        return layout.applyChatSize(width, height);
-      }
-    }
+    state
+  });
+  const overlay = createOverlayController({
+    aiButton,
+    chatbox,
+    state
   });
 
   const layout = createLayoutController({
     posKey: POSITION_STORAGE_KEY,
     elements,
     state,
-    onResizeCornerChange(layoutResult) {
-      state.resizeCornerVertical = layoutResult.isAbove ? "top" : "bottom";
-      state.resizeCornerHorizontal = layoutResult.isButtonLeft
-        ? "right"
-        : "left";
-      const resizeCorner = getById<HTMLDivElement>("ai-resize-corner");
-      resizeCorner.style.top =
-        resizeCorner.style.bottom =
-        resizeCorner.style.left =
-        resizeCorner.style.right =
-          "";
-      resizeCorner.style[state.resizeCornerVertical] = "0";
-      resizeCorner.style[state.resizeCornerHorizontal] = "0";
-      const radiusMap: Record<string, string> = {
-        tl: "8px 0 0 0",
-        tr: "0 8px 0 0",
-        br: "0 0 8px 0",
-        bl: "0 0 0 8px"
-      };
-      const key =
-        state.resizeCornerVertical[0] + state.resizeCornerHorizontal[0];
-      resizeCorner.setAttribute("data-corner", key);
-      resizeCorner.style.borderRadius = radiusMap[key] || "";
-      resizeCorner.style.cursor =
-        (state.resizeCornerVertical === "top") ===
-        (state.resizeCornerHorizontal === "left")
-          ? "nwse-resize"
-          : "nesw-resize";
-    },
+    onResizeCornerChange: overlay.updateResizeCorner,
     onAutoSave() {
       void settings.autoSave();
     }
+  });
+  settings.attachLayout(layout);
+  overlay.attachLayout(layout);
+  const chatController = createChatController({
+    messages,
+    image,
+    sendToAI
   });
 
   const quiz = createQuizController({
@@ -131,39 +88,6 @@ export async function startContentApp(): Promise<void> {
     sendToAI,
     captureTab: () => browser.runtime.sendMessage({ type: "captureTab" })
   });
-
-  async function handleSend(): Promise<void> {
-    const input = getById<HTMLTextAreaElement>("ai-chatbox-input");
-    const text = input.value.trim();
-    const attachment = image.getAttachment();
-    if (!text && !attachment.base64) {
-      return;
-    }
-
-    if (text) {
-      messages.addUserMessage(text);
-    }
-    if (attachment.base64) {
-      messages.addUserMessage("[Image attached]");
-    }
-
-    input.value = "";
-    messages.showLoading();
-
-    try {
-      const response = await sendToAI(
-        text,
-        attachment.base64,
-        attachment.mimeType
-      );
-      messages.hideLoading();
-      messages.addBotMessage(response);
-      image.remove();
-    } catch (error) {
-      messages.hideLoading();
-      messages.showError(error);
-    }
-  }
 
   layout.loadBtnPos((initialPosition) => {
     layout.normalizeViewportState({
@@ -196,13 +120,13 @@ export async function startContentApp(): Promise<void> {
     state,
     posKey: POSITION_STORAGE_KEY,
     chat: {
-      toggle: toggleChatbox,
-      close: closeChatbox,
-      send: handleSend,
+      toggle: overlay.toggleChatbox,
+      close: overlay.closeChatbox,
+      send: chatController.send,
       runQuizScreenshot: quiz.runScreenshotQuiz
     },
     settings: {
-      toggle: toggleSettings,
+      toggle: overlay.toggleSettings,
       autoSave: settings.autoSave,
       updateProviderModels: settings.updateProviderModels
     },
