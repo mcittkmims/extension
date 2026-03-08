@@ -1,4 +1,4 @@
-export const OPENCODE_DEFAULT_URL = "http://127.0.0.1:4096";
+export { OPENCODE_DEFAULT_URL } from "../shared/opencode";
 
 export const PROVIDER_MODELS = {
   gemini: [

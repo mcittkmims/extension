@@ -1,4 +1,4 @@
-export const OPENCODE_DEFAULT_URL = "http://127.0.0.1:4096";
+import { normalizeOpenCodeUrl } from "../shared/opencode";
 
 const OPENCODE_SESSION_MAP_KEY = "opencodeSessionsByPage";
 
@@ -67,14 +67,6 @@ function parseErrorPayload(text: string): string {
   } catch {
     return text;
   }
-}
-
-export function normalizeOpenCodeUrl(url: string | undefined): string {
-  const raw = (url || "").trim();
-  if (!raw) {
-    return OPENCODE_DEFAULT_URL;
-  }
-  return raw.replace(/\/$/, "");
 }
 
 function createOpenCodeAuthHeader(password: string): string | null {

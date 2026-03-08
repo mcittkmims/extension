@@ -15,8 +15,7 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.d.ts",
-    "scripts/**/*.ts",
-    "vite.config.ts",
+    "vite*.config.ts",
     "eslint.config.mjs"
   ]
 }
