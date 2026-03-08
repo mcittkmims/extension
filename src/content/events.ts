@@ -10,53 +10,54 @@ interface EventBindingsOptions {
   elements: OverlayElements;
   state: OverlayState;
   posKey: string;
-  toggleChatbox: () => void;
-  closeChatbox: () => void;
-  toggleSettings: () => void;
-  autoSave: () => Promise<void>;
-  normalizeViewportState: (options?: {
-    left?: number;
-    top?: number;
-    persist?: boolean;
-  }) => void;
-  getViewportBounds: () => Position & { width: number; height: number };
-  getChatSizeLimits: () => {
-    minWidth: number;
-    maxWidth: number;
-    minHeight: number;
-    maxHeight: number;
+  chat: {
+    toggle: () => void;
+    close: () => void;
+    send: () => Promise<void>;
+    runQuizScreenshot: () => Promise<void>;
   };
-  updateDarkMode: () => void;
-  updateProviderModels: (
-    provider: string,
-    model: string | null,
-    settings?: object
-  ) => Promise<void>;
-  handleSend: () => Promise<void>;
-  handleQuizScreenshot: () => Promise<void>;
-  handleImageFile: (file: File) => void;
-  removeImage: () => void;
-  openImagePicker: () => void;
+  settings: {
+    toggle: () => void;
+    autoSave: () => Promise<void>;
+    updateProviderModels: (
+      provider: string,
+      model: string | null,
+      settings?: object
+    ) => Promise<void>;
+  };
+  layout: {
+    normalizeViewportState: (options?: {
+      left?: number;
+      top?: number;
+      persist?: boolean;
+    }) => void;
+    getViewportBounds: () => Position & { width: number; height: number };
+    getChatSizeLimits: () => {
+      minWidth: number;
+      maxWidth: number;
+      minHeight: number;
+      maxHeight: number;
+    };
+  };
+  theme: {
+    updateDarkMode: () => void;
+  };
+  images: {
+    handleFile: (file: File) => void;
+    remove: () => void;
+    openPicker: () => void;
+  };
 }
 
 export function bindOverlayEvents({
   elements,
   state,
   posKey,
-  toggleChatbox,
-  closeChatbox,
-  toggleSettings,
-  autoSave,
-  normalizeViewportState,
-  getViewportBounds,
-  getChatSizeLimits,
-  updateDarkMode,
-  updateProviderModels,
-  handleSend,
-  handleQuizScreenshot,
-  handleImageFile,
-  removeImage,
-  openImagePicker
+  chat,
+  settings,
+  layout,
+  theme,
+  images
 }: EventBindingsOptions): void {
   const { aiButton, chatbox } = elements;
   const resizeCorner = getById<HTMLDivElement>("ai-resize-corner");
@@ -83,7 +84,7 @@ export function bindOverlayEvents({
     const positionChange = changes[posKey];
     if (positionChange?.newValue && !state.isDragging) {
       const pos = positionChange.newValue as Position;
-      normalizeViewportState({ left: pos.left, top: pos.top });
+      layout.normalizeViewportState({ left: pos.left, top: pos.top });
     }
   });
 
@@ -114,7 +115,7 @@ export function bindOverlayEvents({
     if (state.dragMoved) {
       document.body.style.userSelect = "none";
       aiButton.style.cursor = "grabbing";
-      normalizeViewportState({
+      layout.normalizeViewportState({
         left: state.btnStartLeft + dx,
         top: state.btnStartTop + dy
       });
@@ -136,7 +137,7 @@ export function bindOverlayEvents({
       return;
     }
 
-    toggleChatbox();
+    chat.toggle();
   });
 
   resizeCorner.addEventListener("mousedown", (event) => {
@@ -155,8 +156,8 @@ export function bindOverlayEvents({
       return;
     }
 
-    const viewport = getViewportBounds();
-    const limits = getChatSizeLimits();
+    const viewport = layout.getViewportBounds();
+    const limits = layout.getChatSizeLimits();
     const pointerX = event.clientX;
     const pointerY = event.clientY;
     let newWidth =
@@ -205,7 +206,7 @@ export function bindOverlayEvents({
     }
 
     state.isResizing = false;
-    void autoSave();
+    void settings.autoSave();
   });
 
   const scheduleViewportNormalize = () => {
@@ -213,7 +214,7 @@ export function bindOverlayEvents({
       clearTimeout(state.viewportNormalizeTimer);
     }
     state.viewportNormalizeTimer = window.setTimeout(() => {
-      normalizeViewportState({ persist: true });
+      layout.normalizeViewportState({ persist: true });
     }, 120);
   };
 
@@ -236,7 +237,7 @@ export function bindOverlayEvents({
     }
 
     event.preventDefault();
-    toggleChatbox();
+    chat.toggle();
   });
 
   document.addEventListener("keydown", (event) => {
@@ -255,51 +256,59 @@ export function bindOverlayEvents({
     }
 
     event.preventDefault();
-    void handleQuizScreenshot();
+    void chat.runQuizScreenshot();
   });
 
   queryRequired<HTMLButtonElement>(chatbox, ".ai-close").addEventListener(
     "click",
-    closeChatbox
+    chat.close
   );
   getById<HTMLButtonElement>("ai-settings-toggle").addEventListener(
     "click",
-    toggleSettings
+    settings.toggle
   );
 
   providerSelect.addEventListener("change", async () => {
-    await updateProviderModels(providerSelect.value, null);
-    await autoSave();
+    await settings.updateProviderModels(providerSelect.value, null);
+    await settings.autoSave();
   });
 
   modelSelect.addEventListener("change", () => {
-    void autoSave();
+    void settings.autoSave();
   });
   apiKeyInput.addEventListener("blur", () => {
-    void autoSave();
+    void settings.autoSave();
   });
 
   opencodePasswordInput.addEventListener("blur", async () => {
-    const settings = {
+    const nextSettings = {
       opencodeUrl: opencodeUrlInput.value,
       opencodePassword: opencodePasswordInput.value
     };
     state.opencodeModelCache = { key: "", models: [] };
-    await autoSave();
+    await settings.autoSave();
     if (providerSelect.value === "opencode") {
-      await updateProviderModels("opencode", modelSelect.value, settings);
+      await settings.updateProviderModels(
+        "opencode",
+        modelSelect.value,
+        nextSettings
+      );
     }
   });
 
   opencodeUrlInput.addEventListener("blur", async () => {
-    const settings = {
+    const nextSettings = {
       opencodeUrl: opencodeUrlInput.value,
       opencodePassword: opencodePasswordInput.value
     };
     state.opencodeModelCache = { key: "", models: [] };
-    await autoSave();
+    await settings.autoSave();
     if (providerSelect.value === "opencode") {
-      await updateProviderModels("opencode", modelSelect.value, settings);
+      await settings.updateProviderModels(
+        "opencode",
+        modelSelect.value,
+        nextSettings
+      );
     }
   });
 
@@ -307,41 +316,41 @@ export function bindOverlayEvents({
     getById<HTMLSpanElement>("ai-opacity-value").textContent =
       `${getInputEventValue(event)}%`;
     elements.chatbox.style.opacity = `${parseInt(getInputEventValue(event), 10) / 100}`;
-    void autoSave();
+    void settings.autoSave();
   });
 
   buttonOpacitySlider.addEventListener("input", (event) => {
     getById<HTMLSpanElement>("ai-btn-opacity-value").textContent =
       `${getInputEventValue(event)}%`;
     elements.aiButton.style.opacity = `${parseInt(getInputEventValue(event), 10) / 100}`;
-    void autoSave();
+    void settings.autoSave();
   });
 
   getById<HTMLButtonElement>("ai-chatbox-send").addEventListener(
     "click",
     () => {
-      void handleSend();
+      void chat.send();
     }
   );
   getById<HTMLButtonElement>("ai-quiz-screenshot-btn").addEventListener(
     "click",
     () => {
-      void handleQuizScreenshot();
+      void chat.runQuizScreenshot();
     }
   );
   chatboxInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      void handleSend();
+      void chat.send();
     }
   });
   getById<HTMLButtonElement>("ai-remove-image").addEventListener(
     "click",
-    removeImage
+    images.remove
   );
   getById<HTMLButtonElement>("ai-attach-image-btn").addEventListener(
     "click",
-    openImagePicker
+    images.openPicker
   );
 
   imagePreview.addEventListener("click", (event) => {
@@ -352,7 +361,7 @@ export function bindOverlayEvents({
     if (target.id === "ai-remove-image" || target.closest("#ai-remove-image")) {
       return;
     }
-    openImagePicker();
+    images.openPicker();
   });
 
   inputArea.addEventListener("dragover", (event) => {
@@ -368,7 +377,7 @@ export function bindOverlayEvents({
     inputArea.classList.remove("dragover");
     const files = event.dataTransfer?.files;
     if (files && files.length > 0) {
-      handleImageFile(files[0]);
+      images.handleFile(files[0]);
     }
   });
 
@@ -385,14 +394,14 @@ export function bindOverlayEvents({
       if (item.type.includes("image")) {
         const file = item.getAsFile();
         if (file) {
-          handleImageFile(file);
+          images.handleFile(file);
         }
         break;
       }
     }
   });
 
-  const darkObserver = new MutationObserver(updateDarkMode);
+  const darkObserver = new MutationObserver(theme.updateDarkMode);
   darkObserver.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["class", "style", "data-theme", "data-color-scheme"]

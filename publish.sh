@@ -30,7 +30,7 @@ command -v gh      >/dev/null 2>&1 || { echo "Error: gh not found. Run: brew ins
 command -v node    >/dev/null 2>&1 || { echo "Error: node not found."; exit 1; }
 
 # ── Read version from manifest ────────────────────────────────────────────────
-VERSION=$(node -p "require('./manifest.json').version")
+VERSION=$(node -p "require('./public/manifest.json').version")
 TAG="v${VERSION}"
 echo "▶ Publishing ${TAG}..."
 
@@ -43,8 +43,8 @@ web-ext sign \
     --api-key    "$AMO_JWT_ISSUER" \
     --api-secret "$AMO_JWT_SECRET" \
     --channel    unlisted \
-    --artifacts-dir web-ext-artifacts \
-    --ignore-files "*.sh" "*.zip" "*.md" ".env" ".env.*" ".gitignore" "updates.json" "web-ext-artifacts/**" ".github/**" "node_modules/**" ".vite-build/**" "src/**" "scripts/**" "bun.lock" "package.json" "tsconfig.json" "eslint.config.mjs" ".prettierrc.json" ".prettierignore" ".editorconfig" "vite.config.ts"
+    --source-dir dist \
+    --artifacts-dir web-ext-artifacts
 
 # Find the signed .xpi
 XPI=$(ls web-ext-artifacts/*.xpi 2>/dev/null | head -1)
@@ -73,7 +73,7 @@ if (!updates.find(e => e.version === '${VERSION}')) {
 "
 
 # ── Commit & push ─────────────────────────────────────────────────────────────
-git add manifest.json updates.json
+git add public/manifest.json updates.json
 git diff --cached --quiet || git commit -m "v${VERSION}"
 git push
 echo "✔ Pushed to GitHub"
