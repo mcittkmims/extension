@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Clipboard Manager</title>
     <style>
+      :root {
+        --popup-bg: #f8f9fa;
+        --popup-surface: #fff;
+        --popup-border: #dee2e6;
+        --popup-border-strong: #ced4da;
+        --popup-fg: #1d2125;
+        --popup-fg-muted: #6c757d;
+        --popup-fg-soft: #adb5bd;
+        --popup-accent: #5a5a5a;
+        --popup-accent-hover: #3a3a3a;
+        --popup-danger-bg: #f8d7da;
+        --popup-danger-fg: #721c24;
+        --popup-danger-border: #f5c6cb;
+        --popup-hover-bg: #e9ecef;
+        --popup-toast-bg: #343a40;
+      }
+
       * {
         box-sizing: border-box;
         margin: 0;
@@ -16,7 +33,7 @@
         font-family:
           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
           "Helvetica Neue", Arial, sans-serif;
-        background: #f8f9fa;
+        background: var(--popup-bg);
       }
 
       .container {
@@ -29,11 +46,11 @@
         justify-content: space-between;
         margin-bottom: 10px;
         padding-bottom: 10px;
-        border-bottom: 1px solid #dee2e6;
+        border-bottom: 1px solid var(--popup-border);
       }
 
       .header h1 {
-        color: #1d2125;
+        color: var(--popup-fg);
         font-size: 14px;
         font-weight: 600;
       }
@@ -48,22 +65,24 @@
       .input-row input {
         flex: 1;
         padding: 7px 9px;
-        border: 1px solid #ced4da;
+        border: 1px solid var(--popup-border-strong);
         border-radius: 4px;
         font-size: 12px;
-        background: #fff;
-        transition: all 0.15s;
+        background: var(--popup-surface);
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
       }
 
       .input-row input:focus {
         outline: none;
-        border-color: #5a5a5a;
+        border-color: var(--popup-accent);
         box-shadow: 0 0 0 2px rgba(90, 90, 90, 0.2);
       }
 
       .btn-add {
         padding: 7px 12px;
-        background: #5a5a5a;
+        background: var(--popup-accent);
         color: #fff;
         border: none;
         border-radius: 4px;
@@ -75,28 +94,36 @@
       }
 
       .btn-add:hover {
-        background: #3a3a3a;
+        background: var(--popup-accent-hover);
       }
 
       /* Trash button */
-      .btn-trash {
+      .btn-trash,
+      .clip-copy,
+      .clip-delete {
         background: none;
-        border: 1px solid #ced4da;
-        border-radius: 4px;
         cursor: pointer;
-        color: #6c757d;
-        padding: 4px 7px;
         line-height: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.15s;
+      }
+
+      .btn-trash {
+        border: 1px solid var(--popup-border-strong);
+        border-radius: 4px;
+        color: var(--popup-fg-muted);
+        padding: 4px 7px;
+        transition:
+          background 0.15s,
+          color 0.15s,
+          border-color 0.15s;
       }
 
       .btn-trash:hover {
-        background: #f8d7da;
-        color: #721c24;
-        border-color: #f5c6cb;
+        background: var(--popup-danger-bg);
+        color: var(--popup-danger-fg);
+        border-color: var(--popup-danger-border);
       }
 
       /* History list */
@@ -123,20 +150,20 @@
         align-items: center;
         gap: 6px;
         padding: 7px 8px;
-        background: #fff;
-        border: 1px solid #dee2e6;
+        background: var(--popup-surface);
+        border: 1px solid var(--popup-border);
         border-radius: 4px;
         transition: border-color 0.15s;
       }
 
       .clip-item:hover {
-        border-color: #5a5a5a;
+        border-color: var(--popup-accent);
       }
 
       .clip-text {
         flex: 1;
         font-size: 11px;
-        color: #1d2125;
+        color: var(--popup-fg);
         font-family: monospace;
         white-space: nowrap;
         overflow: hidden;
@@ -145,23 +172,19 @@
       }
 
       .clip-text:hover {
-        color: #3a3a3a;
+        color: var(--popup-accent-hover);
       }
 
       .clip-copy,
       .clip-delete {
         flex-shrink: 0;
-        background: none;
         border: none;
-        cursor: pointer;
         font-size: 12px;
         padding: 2px 4px;
         border-radius: 3px;
-        line-height: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.15s;
+        transition:
+          background 0.15s,
+          color 0.15s;
       }
 
       .clip-copy {
@@ -169,16 +192,16 @@
       }
 
       .clip-copy:hover {
-        background: #e9ecef;
+        background: var(--popup-hover-bg);
       }
 
       .clip-delete {
-        color: #adb5bd;
+        color: var(--popup-fg-soft);
       }
 
       .clip-delete:hover {
-        background: #f8d7da;
-        color: #721c24;
+        background: var(--popup-danger-bg);
+        color: var(--popup-danger-fg);
       }
 
       /* Toast */
@@ -187,7 +210,7 @@
         bottom: 10px;
         left: 50%;
         transform: translateX(-50%);
-        background: #343a40;
+        background: var(--popup-toast-bg);
         color: #fff;
         font-size: 11px;
         padding: 5px 12px;
