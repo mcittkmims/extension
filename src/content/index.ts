@@ -393,6 +393,14 @@ Begin.`;
     fileInput.click();
   }
 
+  function getDefaultButtonPosition(): { left: number; top: number } {
+    const viewport = layout.getViewportBounds();
+    return {
+      left: viewport.left + viewport.width - 38,
+      top: viewport.top + viewport.height - 38
+    };
+  }
+
   layout.loadBtnPos((initialPosition) => {
     layout.normalizeViewportState({
       left: initialPosition.left,
@@ -433,6 +441,25 @@ Begin.`;
     }
   });
 
+  browser.runtime.onMessage.addListener((message: { type?: string }) => {
+    if (message.type === "resetPosition") {
+      const position = getDefaultButtonPosition();
+      layout.normalizeViewportState({
+        left: position.left,
+        top: position.top,
+        persist: true
+      });
+      return Promise.resolve({ success: true });
+    }
+
+    if (message.type === "quizScreenshot") {
+      void handleQuizScreenshot();
+      return Promise.resolve({ success: true });
+    }
+
+    return false;
+  });
+
   bindOverlayEvents({
     elements,
     state,
@@ -442,6 +469,8 @@ Begin.`;
     toggleSettings,
     autoSave,
     normalizeViewportState: layout.normalizeViewportState,
+    getViewportBounds: layout.getViewportBounds,
+    getChatSizeLimits: layout.getChatSizeLimits,
     updateDarkMode,
     updateProviderModels,
     handleSend,
