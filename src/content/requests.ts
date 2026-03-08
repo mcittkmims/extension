@@ -1,11 +1,11 @@
 import type { PendingRequest, StoredSettings } from "./types";
+import { normalizeOpenCodeUrl } from "../shared/opencode";
 
 interface SendToAIOptions {
   text: string;
   imageBase64?: string | null;
   imageMimeType?: string | null;
   settings: StoredSettings;
-  normalizeOpenCodeUrl: (url: string | null | undefined) => string;
   getPageSessionKey: () => string;
   pendingRequests: Map<string, PendingRequest>;
 }
@@ -166,7 +166,6 @@ export async function sendToAI({
   imageBase64 = null,
   imageMimeType = null,
   settings,
-  normalizeOpenCodeUrl,
   getPageSessionKey,
   pendingRequests
 }: SendToAIOptions): Promise<string> {

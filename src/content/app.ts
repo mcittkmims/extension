@@ -13,11 +13,7 @@ import {
   setupPendingRequestRuntime
 } from "./runtime";
 import { createOverlayState } from "./state";
-import {
-  createSettingsController,
-  getApiKey,
-  normalizeOpenCodeUrl
-} from "./settings";
+import { createSettingsController, getApiKey } from "./settings";
 import { createOverlayController } from "./overlay";
 import { createThemeController } from "./theme";
 import type { PendingRequest } from "./types";
@@ -49,7 +45,6 @@ export async function startContentApp(): Promise<void> {
       imageBase64,
       imageMimeType,
       settings,
-      normalizeOpenCodeUrl,
       getPageSessionKey,
       pendingRequests
     });
