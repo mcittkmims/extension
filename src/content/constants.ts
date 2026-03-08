@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 export const OPENCODE_DEFAULT_URL = "http://127.0.0.1:4096";
 
 export const PROVIDER_MODELS = {

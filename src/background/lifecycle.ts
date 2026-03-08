@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 export function setupLifecycle() {
   browser.runtime.onInstalled.addListener(function (details) {
     if (details.reason === "install") {

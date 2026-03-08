@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 export function createOverlay() {
   const aiButton = document.createElement("button");
   aiButton.id = "moodle-ai-assistant-btn";

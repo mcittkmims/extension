@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 function getProviderErrorMessage(text, status) {
   if (!text) return `Request failed: ${status}`;
   try {
