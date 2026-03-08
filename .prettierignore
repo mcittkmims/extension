@@ -1,0 +1,12 @@
+background.js
+content.js
+popup.js
+node_modules
+.vite-build
+web-ext-artifacts
+.github
+icons
+katex
+marked
+*.xpi
+*.zip

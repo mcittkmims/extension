@@ -1,0 +1,29 @@
+{
+  "name": "clipboard-manager-extension",
+  "private": true,
+  "version": "2.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "bun run scripts/build.ts",
+    "dev": "bun run scripts/build.ts --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src scripts vite.config.ts eslint.config.mjs",
+    "lint:fix": "eslint --fix src scripts vite.config.ts eslint.config.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "@types/firefox-webext-browser": "^120.0.4",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.22.0",
+    "eslint-config-prettier": "^10.1.1",
+    "globals": "^16.0.0",
+    "katex": "^0.16.37",
+    "marked": "^17.0.4",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.1",
+    "vite": "^6.2.2"
+  }
+}

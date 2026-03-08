@@ -4,10 +4,10 @@
   "version": "2.1.1",
   "description": "Simple clipboard history and text snippets manager",
   "icons": {
-    "16":  "icons/icon16.png",
-    "32":  "icons/icon32.png",
-    "48":  "icons/icon48.png",
-    "96":  "icons/icon96.png",
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "96": "icons/icon96.png",
     "128": "icons/icon128.png"
   },
   "permissions": [
@@ -24,11 +24,7 @@
     "http://127.0.0.1/*",
     "http://localhost/*"
   ],
-  "web_accessible_resources": [
-    "katex/katex.min.js",
-    "katex/katex.min.css",
-    "katex/fonts/*.woff2"
-  ],
+  "web_accessible_resources": ["katex/katex.min.css", "katex/fonts/*.woff2"],
   "browser_specific_settings": {
     "gecko": {
       "id": "clipboard-manager@tools.browser",
@@ -42,7 +38,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["katex/katex.min.js", "marked/marked.min.js", "content.js"],
+      "js": ["content.js"],
       "css": ["styles.css", "katex/katex.min.css"],
       "run_at": "document_end"
     }
@@ -51,9 +47,9 @@
     "default_popup": "popup.html",
     "default_title": "Clipboard Manager",
     "default_icon": {
-      "16":  "icons/icon16.png",
-      "32":  "icons/icon32.png",
-      "48":  "icons/icon48.png",
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },

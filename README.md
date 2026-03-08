@@ -24,8 +24,32 @@ Updates are delivered automatically; no reinstall needed for future versions.
 
 ### Development (temporary load)
 
-1. Open Firefox → `about:debugging` → **This Firefox**
-2. Click **Load Temporary Add-on...** and select `manifest.json`
+1. Install dependencies with `bun install`
+2. Build the runtime files with `bun run build`
+3. Open Firefox -> `about:debugging` -> **This Firefox**
+4. Click **Load Temporary Add-on...** and select `manifest.json`
+
+### Tooling
+
+- `bun run build` - bundle `src/` entry points to the runtime files used by Firefox
+- `bun run dev` - rebuild on file changes
+- `bun run typecheck` - run TypeScript checks for the Vite-based source tree
+- `bun run lint` - run ESLint
+- `bun run format` - run Prettier
+
+## Build Layout
+
+```text
+src/
+├── background/index.ts   # Background entry source
+├── content/index.ts      # Content script entry source
+├── popup/index.ts        # Popup entry source
+└── globals.d.ts          # Browser/global declarations
+scripts/
+└── build.ts              # Vite multi-entry build runner
+```
+
+The checked-in `background.js`, `content.js`, and `popup.js` files are generated build outputs so the extension can still be loaded directly from the repository root.
 
 ## Usage
 
@@ -67,4 +91,5 @@ This will: sign via AMO API → update `updates.json` → push to GitHub → cre
 - No data is collected or transmitted by the extension
 
 ## License
+
 MIT License
