@@ -10,7 +10,7 @@
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"]
+    "types": ["node", "firefox-webext-browser"]
   },
   "include": [
     "src/**/*.ts",

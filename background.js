@@ -131,16 +131,20 @@
   const OPENCODE_DEFAULT_URL = "http://127.0.0.1:4096";
   const OPENCODE_SESSION_MAP_KEY = "opencodeSessionsByPage";
   function parseErrorPayload(text) {
-    if (!text) return "";
+    if (!text) {
+      return "";
+    }
     try {
       const json = JSON.parse(text);
-      if (json.error && typeof json.error.message === "string") {
+      if (typeof json.error?.message === "string") {
         return json.error.message;
       }
-      if (json.data && typeof json.data.message === "string") {
+      if (typeof json.data?.message === "string") {
         return json.data.message;
       }
-      if (typeof json.message === "string") return json.message;
+      if (typeof json.message === "string") {
+        return json.message;
+      }
       return text;
     } catch {
       return text;
@@ -148,11 +152,15 @@
   }
   function normalizeOpenCodeUrl(url) {
     const raw = (url || "").trim();
-    if (!raw) return OPENCODE_DEFAULT_URL;
+    if (!raw) {
+      return OPENCODE_DEFAULT_URL;
+    }
     return raw.replace(/\/$/, "");
   }
   function createOpenCodeAuthHeader(password) {
-    if (!password) return null;
+    if (!password) {
+      return null;
+    }
     return `Basic ${btoa(`opencode:${password}`)}`;
   }
   function buildOpenCodeCorsHint(baseUrl) {
@@ -161,7 +169,9 @@
     let port = "4096";
     try {
       const parsed = new URL(baseUrl);
-      if (parsed.hostname) hostname = parsed.hostname;
+      if (parsed.hostname) {
+        hostname = parsed.hostname;
+      }
       if (parsed.port) {
         port = parsed.port;
       } else if (parsed.protocol === "https:") {
@@ -175,21 +185,25 @@
 opencode serve --hostname ${hostname} --port ${port} --cors ${extensionOrigin}`;
   }
   async function openCodeFetch(baseUrl, password, path, options = {}) {
-    const authHeader = createOpenCodeAuthHeader(password);
-    const headers = Object.assign({}, options.headers || {});
-    if (options.method && options.method !== "GET") {
-      headers["Content-Type"] = headers["Content-Type"] || "application/json";
+    const headers = new Headers(options.headers ?? {});
+    if (options.method && options.method !== "GET" && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
     }
-    if (authHeader) headers.Authorization = authHeader;
-    const url = `${baseUrl}${path}`;
+    const authHeader = createOpenCodeAuthHeader(password);
+    if (authHeader) {
+      headers.set("Authorization", authHeader);
+    }
     let response;
     try {
-      response = await fetch(url, Object.assign({}, options, { headers }));
+      response = await fetch(`${baseUrl}${path}`, {
+        method: options.method,
+        body: options.body,
+        headers
+      });
     } catch (error) {
-      throw new Error(
-        `${buildOpenCodeCorsHint(baseUrl)}
-Details: ${error.message || "Network error"}`
-      );
+      const message = error instanceof Error ? error.message : "Network error";
+      throw new Error(`${buildOpenCodeCorsHint(baseUrl)}
+Details: ${message}`);
     }
     if (!response.ok) {
       const text2 = await response.text();
@@ -205,31 +219,27 @@ Details: ${error.message || "Network error"}`
       return null;
     }
     const text = await response.text();
-    if (!text) return {};
+    if (!text) {
+      return {};
+    }
     try {
       return JSON.parse(text);
     } catch {
       throw new Error("OpenCode returned an invalid JSON response.");
     }
   }
-  function storageGet(keys) {
-    return new Promise((resolve) => {
-      browser.storage.local.get(keys, resolve);
-    });
-  }
-  function storageSet(values) {
-    return new Promise((resolve) => {
-      browser.storage.local.set(values, resolve);
-    });
-  }
   async function getOpenCodeSessionMap() {
-    const result = await storageGet([OPENCODE_SESSION_MAP_KEY]);
+    const result = await browser.storage.local.get(
+      OPENCODE_SESSION_MAP_KEY
+    );
     const map = result[OPENCODE_SESSION_MAP_KEY];
-    if (map && typeof map === "object") return map;
+    if (map && typeof map === "object") {
+      return map;
+    }
     return {};
   }
   async function setOpenCodeSessionMap(map) {
-    await storageSet({ [OPENCODE_SESSION_MAP_KEY]: map });
+    await browser.storage.local.set({ [OPENCODE_SESSION_MAP_KEY]: map });
   }
   async function getOpenCodeSessionId(pageKey) {
     const map = await getOpenCodeSessionMap();
@@ -250,39 +260,43 @@ Details: ${error.message || "Network error"}`
   async function createOpenCodeSession(baseUrl, password, pageKey) {
     const title = `Page: ${pageKey.slice(0, 120)}`;
     const body = title ? { title } : {};
-    const data = await openCodeFetch(baseUrl, password, "/session", {
-      method: "POST",
-      body: JSON.stringify(body)
-    });
-    if (!data || !data.id) {
+    const data = await openCodeFetch(
+      baseUrl,
+      password,
+      "/session",
+      {
+        method: "POST",
+        body: JSON.stringify(body)
+      }
+    );
+    if (!data?.id) {
       throw new Error("OpenCode did not return a session ID.");
     }
     return data.id;
   }
   async function ensureOpenCodeSession(baseUrl, password, pageKey) {
     const existing = await getOpenCodeSessionId(pageKey);
-    if (existing) return existing;
+    if (existing) {
+      return existing;
+    }
     const created = await createOpenCodeSession(baseUrl, password, pageKey);
     await saveOpenCodeSessionId(pageKey, created);
     return created;
   }
   function shouldRetryWithNewSession(error) {
-    const message = error && error.message ? error.message : "";
-    return /\(404\)/.test(message);
+    return error instanceof Error && /\(404\)/.test(error.message);
   }
   function extractOpenCodeText(parts) {
-    if (!Array.isArray(parts)) return "";
-    return parts.filter(
-      (part) => part && part.type === "text" && typeof part.text === "string"
-    ).map((part) => part.text).join("\n\n").trim();
+    if (!Array.isArray(parts)) {
+      return "";
+    }
+    return parts.filter((part) => part?.type === "text" && typeof part.text === "string").map((part) => part.text).join("\n\n").trim();
   }
   async function callOpenCode(opencodeConfig, requestBody, pageKey) {
-    const baseUrl = normalizeOpenCodeUrl(
-      opencodeConfig && opencodeConfig.baseUrl
-    );
-    const password = opencodeConfig && opencodeConfig.password ? opencodeConfig.password : "";
+    const baseUrl = normalizeOpenCodeUrl(opencodeConfig?.baseUrl);
+    const password = opencodeConfig?.password || "";
     const scopedPageKey = pageKey || "default";
-    if (!requestBody || !Array.isArray(requestBody.parts) || requestBody.parts.length === 0) {
+    if (!requestBody?.parts || requestBody.parts.length === 0) {
       throw new Error("OpenCode request is missing message parts.");
     }
     await openCodeFetch(baseUrl, password, "/global/health", { method: "GET" });
@@ -314,17 +328,15 @@ Details: ${error.message || "Network error"}`
         }
       );
     }
-    const text = extractOpenCodeText(data && data.parts);
+    const text = extractOpenCodeText(data.parts);
     if (!text) {
       throw new Error("No response generated");
     }
     return text;
   }
   async function getOpenCodeModels(opencodeConfig) {
-    const baseUrl = normalizeOpenCodeUrl(
-      opencodeConfig && opencodeConfig.baseUrl
-    );
-    const password = opencodeConfig && opencodeConfig.password ? opencodeConfig.password : "";
+    const baseUrl = normalizeOpenCodeUrl(opencodeConfig?.baseUrl);
+    const password = opencodeConfig?.password || "";
     await openCodeFetch(baseUrl, password, "/global/health", { method: "GET" });
     const providersData = await openCodeFetch(
       baseUrl,
@@ -332,18 +344,19 @@ Details: ${error.message || "Network error"}`
       "/config/providers",
       { method: "GET" }
     );
-    const providers = Array.isArray(providersData && providersData.providers) ? providersData.providers : [];
-    const defaults = providersData && typeof providersData.default === "object" ? providersData.default : {};
+    const providers = Array.isArray(providersData.providers) ? providersData.providers : [];
+    const defaults = providersData.default && typeof providersData.default === "object" ? providersData.default : {};
     const models = [];
     providers.forEach((provider) => {
-      if (!provider || !provider.id || !provider.models || typeof provider.models !== "object") {
+      if (!provider?.id || !provider.models || typeof provider.models !== "object") {
         return;
       }
-      Object.keys(provider.models).forEach((modelKey) => {
-        const model = provider.models[modelKey] || {};
-        if (model.status === "deprecated") return;
+      Object.entries(provider.models).forEach(([modelKey, model]) => {
+        if (model?.status === "deprecated") {
+          return;
+        }
         const id = `${provider.id}/${modelKey}`;
-        const label = model.name ? `${model.name} (${provider.id})` : id;
+        const label = model?.name ? `${model.name} (${provider.id})` : id;
         models.push({ value: id, label });
       });
     });
@@ -351,94 +364,86 @@ Details: ${error.message || "Network error"}`
     let defaultModel = "";
     const defaultProviders = Object.keys(defaults);
     if (defaultProviders.length > 0) {
-      const providerID = defaultProviders[0];
-      const modelID = defaults[providerID];
-      if (providerID && modelID) {
-        defaultModel = `${providerID}/${modelID}`;
+      const providerId = defaultProviders[0];
+      const modelId = defaults[providerId];
+      if (providerId && modelId) {
+        defaultModel = `${providerId}/${modelId}`;
       }
     }
     return { models, defaultModel };
   }
   function setupRuntimeMessages() {
-    browser.runtime.onMessage.addListener(
-      function(request, sender, sendResponse) {
-        if (request.type === "getSyncKey") {
-          browser.storage.local.get(
-            ["geminiApiKey", "apiProvider"],
-            function(result) {
-              sendResponse({
-                syncKey: result.geminiApiKey || null,
-                provider: result.apiProvider || "gemini"
-              });
-            }
-          );
-          return true;
-        }
-        if (request.type === "getOpenCodeModels") {
-          getOpenCodeModels(request.opencodeConfig).then((data) => {
-            sendResponse({
-              success: true,
-              models: data.models,
-              defaultModel: data.defaultModel || ""
-            });
-          }).catch((error) => {
-            sendResponse({ success: false, error: error.message });
-          });
-          return true;
-        }
-        if (request.type === "captureTab") {
-          browser.tabs.captureVisibleTab(null, { format: "png" }).then((dataUrl) => {
-            const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
-            sendResponse({ success: true, base64, mimeType: "image/png" });
-          }).catch((error) => {
-            sendResponse({ success: false, error: error.message });
-          });
-          return true;
-        }
-        if (request.type === "sendToAPI") {
-          const {
-            apiKey,
-            requestBody,
-            provider,
-            opencodeConfig,
-            pageKey,
-            requestId
-          } = request;
-          const selectedProvider = provider || "gemini";
-          let apiCall;
-          switch (selectedProvider) {
-            case "openai":
-              apiCall = callOpenAI(apiKey, requestBody);
-              break;
-            case "anthropic":
-              apiCall = callAnthropic(apiKey, requestBody);
-              break;
-            case "openrouter":
-              apiCall = callOpenRouter(apiKey, requestBody);
-              break;
-            case "grok":
-              apiCall = callGrok(apiKey, requestBody);
-              break;
-            case "opencode":
-              apiCall = callOpenCode(opencodeConfig, requestBody, pageKey);
-              break;
-            case "gemini":
-            default:
-              apiCall = callGemini(apiKey, requestBody);
-              break;
-          }
-          apiCall.then((text) => {
-            browser.storage.local.set({ [requestId]: { success: true, text } });
-          }).catch((error) => {
-            browser.storage.local.set({
-              [requestId]: { success: false, error: error.message }
-            });
-          });
-          sendResponse({ received: true });
-          return true;
-        }
+    browser.runtime.onMessage.addListener((request) => {
+      if (request.type === "getSyncKey") {
+        return browser.storage.local.get(["geminiApiKey", "apiProvider"]).then((result) => ({
+          syncKey: result.geminiApiKey || null,
+          provider: result.apiProvider || "gemini"
+        }));
       }
-    );
+      if (request.type === "getOpenCodeModels") {
+        return getOpenCodeModels(request.opencodeConfig).then((data) => ({
+          success: true,
+          models: data.models,
+          defaultModel: data.defaultModel || ""
+        })).catch((error) => ({
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }));
+      }
+      if (request.type === "captureTab") {
+        return browser.tabs.captureVisibleTab(void 0, { format: "png" }).then((dataUrl) => ({
+          success: true,
+          base64: dataUrl.replace(/^data:image\/png;base64,/, ""),
+          mimeType: "image/png"
+        })).catch((error) => ({
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }));
+      }
+      if (request.type !== "sendToAPI" || !request.requestId || !request.requestBody) {
+        return void 0;
+      }
+      const selectedProvider = request.provider || "gemini";
+      let apiCall;
+      switch (selectedProvider) {
+        case "openai":
+          apiCall = callOpenAI(request.apiKey || "", request.requestBody);
+          break;
+        case "anthropic":
+          apiCall = callAnthropic(request.apiKey || "", request.requestBody);
+          break;
+        case "openrouter":
+          apiCall = callOpenRouter(request.apiKey || "", request.requestBody);
+          break;
+        case "grok":
+          apiCall = callGrok(request.apiKey || "", request.requestBody);
+          break;
+        case "opencode":
+          apiCall = callOpenCode(
+            request.opencodeConfig,
+            request.requestBody,
+            request.pageKey
+          );
+          break;
+        case "gemini":
+        default:
+          apiCall = callGemini(request.apiKey || "", request.requestBody);
+          break;
+      }
+      void apiCall.then(
+        (text) => browser.storage.local.set({
+          [request.requestId]: { success: true, text }
+        })
+      ).catch(
+        (error) => browser.storage.local.set({
+          [request.requestId]: {
+            success: false,
+            error: error instanceof Error ? error.message : String(error)
+          }
+        })
+      );
+      return Promise.resolve({ received: true });
+    });
   }
   setupLifecycle();
   setupRuntimeMessages();

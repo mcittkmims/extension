@@ -1,9 +1,18 @@
-// @ts-nocheck
-
 import { OPENCODE_DEFAULT_URL, PROVIDER_MODELS } from "./constants";
+import type {
+  ModelCache,
+  ModelOption,
+  OpenCodeConfig,
+  OpenCodeModelsResponse,
+  StoredSettings
+} from "./types";
+import { getById } from "./utils";
 
-export function setModelOptions(models, savedModel) {
-  const modelSelect = document.getElementById("ai-model-select");
+export function setModelOptions(
+  models: ModelOption[],
+  savedModel: string | null
+) {
+  const modelSelect = getById<HTMLSelectElement>("ai-model-select");
   modelSelect.innerHTML = "";
   models.forEach((m) => {
     const opt = document.createElement("option");
@@ -18,63 +27,52 @@ export function setModelOptions(models, savedModel) {
   }
 }
 
-export function normalizeOpenCodeUrl(url) {
+export function normalizeOpenCodeUrl(url: string | null | undefined): string {
   const raw = (url || "").trim();
   if (!raw) return OPENCODE_DEFAULT_URL;
   return raw.replace(/\/$/, "");
 }
 
-export function updateProviderSettingsUI(provider) {
+export function updateProviderSettingsUI(provider: string): void {
   const isOpenCode = provider === "opencode";
-  document
-    .getElementById("ai-api-key-group")
-    .classList.toggle("hidden", isOpenCode);
-  document
-    .getElementById("ai-opencode-group")
-    .classList.toggle("hidden", !isOpenCode);
+  getById<HTMLDivElement>("ai-api-key-group").classList.toggle(
+    "hidden",
+    isOpenCode
+  );
+  getById<HTMLDivElement>("ai-opencode-group").classList.toggle(
+    "hidden",
+    !isOpenCode
+  );
 }
 
-export function fetchOpenCodeModels(opencodeConfig) {
-  return new Promise((resolve, reject) => {
-    browser.runtime.sendMessage(
-      {
-        type: "getOpenCodeModels",
-        opencodeConfig
-      },
-      (response) => {
-        if (browser.runtime.lastError) {
-          reject(new Error(browser.runtime.lastError.message));
-          return;
-        }
-        if (!response || !response.success) {
-          reject(
-            new Error(
-              response && response.error
-                ? response.error
-                : "Failed to load models"
-            )
-          );
-          return;
-        }
-        resolve(response);
-      }
-    );
-  });
+export async function fetchOpenCodeModels(
+  opencodeConfig: OpenCodeConfig
+): Promise<OpenCodeModelsResponse> {
+  const response = (await browser.runtime.sendMessage({
+    type: "getOpenCodeModels",
+    opencodeConfig
+  })) as OpenCodeModelsResponse;
+
+  if (!response || !response.success) {
+    throw new Error(response?.error || "Failed to load models");
+  }
+
+  return response;
 }
 
 export async function populateModels(
-  provider,
-  savedModel,
-  settings,
-  modelCache
-) {
+  provider: string,
+  savedModel: string | null,
+  settings: Partial<StoredSettings> | undefined,
+  modelCache: ModelCache
+): Promise<void> {
   if (provider !== "opencode") {
     setModelOptions(PROVIDER_MODELS[provider] || [], savedModel);
     return;
   }
 
-  const modelSelect = document.getElementById("ai-model-select");
-  const status = document.getElementById("ai-opencode-status");
+  const modelSelect = getById<HTMLSelectElement>("ai-model-select");
+  const status = getById<HTMLSpanElement>("ai-opencode-status");
   modelSelect.innerHTML = "";
   const loading = document.createElement("option");
   loading.value = "";
@@ -89,7 +87,7 @@ export async function populateModels(
   const cacheKey = `${opencodeConfig.baseUrl}::${opencodeConfig.password}`;
 
   try {
-    let serverModels = [];
+    let serverModels: ModelOption[] = [];
     let defaultModel = "";
 
     if (modelCache.key === cacheKey && modelCache.models.length > 0) {
@@ -109,66 +107,58 @@ export async function populateModels(
     status.textContent = `Connected to ${opencodeConfig.baseUrl}`;
   } catch (error) {
     setModelOptions([{ value: "", label: "Server default model" }], "");
-    status.textContent = `Model fetch failed: ${error.message}`;
+    status.textContent = `Model fetch failed: ${error instanceof Error ? error.message : String(error)}`;
   }
 }
 
-export async function getApiKey() {
-  return new Promise((resolve) => {
-    browser.storage.local.get(
-      [
-        "geminiApiKey",
-        "apiProvider",
-        "apiModel",
-        "opencodeServerUrl",
-        "opencodePassword",
-        "chatOpacity",
-        "btnOpacity",
-        "chatWidth",
-        "chatHeight"
-      ],
-      (result) => {
-        resolve({
-          key: result.geminiApiKey || null,
-          provider: result.apiProvider || "gemini",
-          model: result.apiModel || null,
-          opencodeUrl: result.opencodeServerUrl || OPENCODE_DEFAULT_URL,
-          opencodePassword: result.opencodePassword || "",
-          opacity: result.chatOpacity != null ? result.chatOpacity : 0.95,
-          btnOpacity: result.btnOpacity != null ? result.btnOpacity : 0.25,
-          chatWidth: result.chatWidth != null ? result.chatWidth : 320,
-          chatHeight: result.chatHeight != null ? result.chatHeight : 480
-        });
-      }
-    );
-  });
+export async function getApiKey(): Promise<StoredSettings> {
+  const result = await browser.storage.local.get([
+    "geminiApiKey",
+    "apiProvider",
+    "apiModel",
+    "opencodeServerUrl",
+    "opencodePassword",
+    "chatOpacity",
+    "btnOpacity",
+    "chatWidth",
+    "chatHeight"
+  ]);
+
+  return {
+    key: (result.geminiApiKey as string | undefined) || null,
+    provider: (result.apiProvider as string | undefined) || "gemini",
+    model: (result.apiModel as string | undefined) || null,
+    opencodeUrl:
+      (result.opencodeServerUrl as string | undefined) || OPENCODE_DEFAULT_URL,
+    opencodePassword: (result.opencodePassword as string | undefined) || "",
+    opacity: typeof result.chatOpacity === "number" ? result.chatOpacity : 0.95,
+    btnOpacity:
+      typeof result.btnOpacity === "number" ? result.btnOpacity : 0.25,
+    chatWidth: typeof result.chatWidth === "number" ? result.chatWidth : 320,
+    chatHeight: typeof result.chatHeight === "number" ? result.chatHeight : 480
+  };
 }
 
 export async function saveApiKey(
-  key,
-  provider,
-  model,
-  opencodeUrl,
-  opencodePassword,
-  opacity,
-  btnOp,
-  chatWidth,
-  chatHeight
-) {
-  return new Promise((resolve) => {
-    browser.storage.local.set(
-      {
-        geminiApiKey: key,
-        apiProvider: provider,
-        apiModel: model,
-        opencodeServerUrl: normalizeOpenCodeUrl(opencodeUrl),
-        opencodePassword: opencodePassword || "",
-        chatOpacity: opacity,
-        btnOpacity: btnOp,
-        chatWidth,
-        chatHeight
-      },
-      resolve
-    );
+  key: string,
+  provider: string,
+  model: string,
+  opencodeUrl: string,
+  opencodePassword: string,
+  opacity: number,
+  btnOp: number,
+  chatWidth: number,
+  chatHeight: number
+): Promise<void> {
+  await browser.storage.local.set({
+    geminiApiKey: key,
+    apiProvider: provider,
+    apiModel: model,
+    opencodeServerUrl: normalizeOpenCodeUrl(opencodeUrl),
+    opencodePassword: opencodePassword || "",
+    chatOpacity: opacity,
+    btnOpacity: btnOp,
+    chatWidth,
+    chatHeight
   });
 }

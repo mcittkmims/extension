@@ -1,4 +1,5 @@
-// @ts-nocheck
+import katex from "katex";
+import { marked } from "marked";
 
 const ALLOWED_MARKDOWN_TAGS = new Set([
   "A",
@@ -30,56 +31,60 @@ const ALLOWED_MARKDOWN_TAGS = new Set([
 ]);
 
 const MARKED_OPTIONS = {
-  gfm: true,
   breaks: true,
-  headerIds: false,
-  mangle: false
+  gfm: true
 };
 
-const MARKED_API =
-  globalThis.marked && typeof globalThis.marked.parse === "function"
-    ? globalThis.marked
-    : null;
+const MATH_TOKEN_PREFIX = "MATH_TOKEN_";
 
-let katexReady = null;
+interface ExtractedMath {
+  latex: string;
+  display: boolean;
+}
 
-export function loadKaTeX() {
-  if (!katexReady) katexReady = Promise.resolve();
+let katexReady: Promise<void> | null = null;
+
+export function loadKaTeX(): Promise<void> {
+  if (!katexReady) {
+    katexReady = Promise.resolve();
+  }
   return katexReady;
 }
 
-export function renderMath(el) {
-  loadKaTeX().then(() => {
-    if (!window.katex) return;
-    el.querySelectorAll(".ai-math-display").forEach((span) => {
+export function renderMath(element: HTMLElement): void {
+  void loadKaTeX().then(() => {
+    element
+      .querySelectorAll<HTMLElement>(".ai-math-display")
+      .forEach((span) => {
+        try {
+          katex.render(span.dataset.latex || "", span, {
+            displayMode: true,
+            throwOnError: false
+          });
+        } catch {
+          span.textContent = span.dataset.latex || "";
+        }
+      });
+
+    element.querySelectorAll<HTMLElement>(".ai-math-inline").forEach((span) => {
       try {
-        katex.render(span.dataset.latex, span, {
-          displayMode: true,
-          throwOnError: false
-        });
-      } catch {
-        span.textContent = span.dataset.latex;
-      }
-    });
-    el.querySelectorAll(".ai-math-inline").forEach((span) => {
-      try {
-        katex.render(span.dataset.latex, span, {
+        katex.render(span.dataset.latex || "", span, {
           displayMode: false,
           throwOnError: false
         });
       } catch {
-        span.textContent = span.dataset.latex;
+        span.textContent = span.dataset.latex || "";
       }
     });
   });
 }
 
-function sanitizeMarkdownNode(node, doc) {
+function sanitizeMarkdownNode(node: Node, doc: Document): Node | null {
   if (node.nodeType === Node.TEXT_NODE) {
-    return doc.createTextNode(node.textContent);
+    return doc.createTextNode(node.textContent || "");
   }
 
-  if (node.nodeType !== Node.ELEMENT_NODE) {
+  if (!(node instanceof Element)) {
     return null;
   }
 
@@ -87,94 +92,108 @@ function sanitizeMarkdownNode(node, doc) {
     const fragment = doc.createDocumentFragment();
     Array.from(node.childNodes).forEach((child) => {
       const sanitizedChild = sanitizeMarkdownNode(child, doc);
-      if (sanitizedChild) fragment.appendChild(sanitizedChild);
+      if (sanitizedChild) {
+        fragment.appendChild(sanitizedChild);
+      }
     });
     return fragment;
   }
 
-  const el = doc.createElement(node.tagName.toLowerCase());
+  const element = doc.createElement(node.tagName.toLowerCase());
 
   if (node.tagName === "A") {
     const href = node.getAttribute("href") || "";
     if (/^(https?:|mailto:)/i.test(href)) {
-      el.setAttribute("href", href);
-      el.setAttribute("target", "_blank");
-      el.setAttribute("rel", "noopener noreferrer");
+      element.setAttribute("href", href);
+      element.setAttribute("target", "_blank");
+      element.setAttribute("rel", "noopener noreferrer");
     }
   } else if (node.tagName === "SPAN") {
-    const cls = node.getAttribute("class") || "";
-    if (cls === "ai-math-display" || cls === "ai-math-inline") {
-      el.setAttribute("class", cls);
+    const className = node.getAttribute("class") || "";
+    if (className === "ai-math-display" || className === "ai-math-inline") {
+      element.setAttribute("class", className);
       const latex = node.getAttribute("data-latex");
-      if (latex != null) el.setAttribute("data-latex", latex);
+      if (latex) {
+        element.setAttribute("data-latex", latex);
+      }
     }
   } else if (node.tagName === "CODE") {
-    const cls = node.getAttribute("class") || "";
-    if (/^language-[a-z0-9_-]+$/i.test(cls)) {
-      el.setAttribute("class", cls);
+    const className = node.getAttribute("class") || "";
+    if (/^language-[a-z0-9_-]+$/i.test(className)) {
+      element.setAttribute("class", className);
     }
   } else if (node.tagName === "TH" || node.tagName === "TD") {
     const align = node.getAttribute("align");
     if (align && /^(left|center|right)$/i.test(align)) {
-      el.setAttribute("align", align.toLowerCase());
+      element.setAttribute("align", align.toLowerCase());
     }
   }
 
   Array.from(node.childNodes).forEach((child) => {
     const sanitizedChild = sanitizeMarkdownNode(child, doc);
-    if (sanitizedChild) el.appendChild(sanitizedChild);
+    if (sanitizedChild) {
+      element.appendChild(sanitizedChild);
+    }
   });
 
-  return el;
+  return element;
 }
 
-function sanitizeMarkdownHtml(html) {
+function sanitizeMarkdownHtml(html: string): DocumentFragment {
   const parser = new DOMParser();
   const parsed = parser.parseFromString(html, "text/html");
   const fragment = document.createDocumentFragment();
 
   Array.from(parsed.body.childNodes).forEach((node) => {
     const sanitizedNode = sanitizeMarkdownNode(node, document);
-    if (sanitizedNode) fragment.appendChild(sanitizedNode);
+    if (sanitizedNode) {
+      fragment.appendChild(sanitizedNode);
+    }
   });
 
   return fragment;
 }
 
-function extractMath(text) {
-  const mathStore = [];
-  const stash = (latex, display) => {
+function extractMath(text: string): {
+  text: string;
+  mathStore: ExtractedMath[];
+} {
+  const mathStore: ExtractedMath[] = [];
+  const stash = (latex: string, display: boolean): string => {
     const idx = mathStore.length;
     mathStore.push({ latex: latex.trim(), display });
-    return `\x00MATH${idx}\x00`;
+    return `${MATH_TOKEN_PREFIX}${idx}__`;
   };
 
   return {
     text: text
-      .replace(/\\\[([\s\S]*?)\\\]/g, (_, latex) => stash(latex, true))
-      .replace(/\\\(([\s\S]*?)\\\)/g, (_, latex) => stash(latex, false))
-      .replace(/(?<!\$)\$(?!\$)([^$\n]+?)\$/g, (_, latex) =>
+      .replace(/\\\[([\s\S]*?)\\\]/g, (_, latex: string) => stash(latex, true))
+      .replace(/\\\(([\s\S]*?)\\\)/g, (_, latex: string) => stash(latex, false))
+      .replace(/(?<!\$)\$(?!\$)([^$\n]+?)\$/g, (_, latex: string) =>
         stash(latex, false)
       )
-      .replace(/\$\$([\s\S]*?)\$\$/g, (_, latex) => stash(latex, true)),
+      .replace(/\$\$([\s\S]*?)\$\$/g, (_, latex: string) => stash(latex, true)),
     mathStore
   };
 }
 
-function renderMarkdown(text) {
-  return MARKED_API ? MARKED_API.parse(text, MARKED_OPTIONS) : `<p>${text}</p>`;
+function renderMarkdown(text: string): string {
+  return marked.parse(text, MARKED_OPTIONS) as string;
 }
 
-function restoreMath(html, mathStore) {
-  return html.replace(/\x00MATH(\d+)\x00/g, (_, i) => {
-    const { latex, display } = mathStore[+i];
-    const cls = display ? "ai-math-display" : "ai-math-inline";
-    const escaped = latex.replace(/"/g, "&quot;");
-    return `<span class="${cls}" data-latex="${escaped}"></span>`;
-  });
+function restoreMath(html: string, mathStore: ExtractedMath[]): string {
+  return html.replace(
+    new RegExp(`${MATH_TOKEN_PREFIX}(\\d+)__`, "g"),
+    (_, index: string) => {
+      const entry = mathStore[Number(index)];
+      const className = entry.display ? "ai-math-display" : "ai-math-inline";
+      const escapedLatex = entry.latex.replace(/"/g, "&quot;");
+      return `<span class="${className}" data-latex="${escapedLatex}"></span>`;
+    }
+  );
 }
 
-export function parseMarkdown(text) {
+export function parseMarkdown(text: string): DocumentFragment {
   const parsed = extractMath(text);
   const html = renderMarkdown(parsed.text);
   return sanitizeMarkdownHtml(restoreMath(html, parsed.mathStore));

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Quick Notes - Study Helper - Background script
 // Handles extension lifecycle, storage, and API requests
 

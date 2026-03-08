@@ -1,6 +1,16 @@
-// @ts-nocheck
+import type { PendingRequest, StoredSettings } from "./types";
 
-export function imageFilenameForMime(mimeType) {
+interface SendToAIOptions {
+  text: string;
+  imageBase64?: string | null;
+  imageMimeType?: string | null;
+  settings: StoredSettings;
+  normalizeOpenCodeUrl: (url: string | null | undefined) => string;
+  getPageSessionKey: () => string;
+  pendingRequests: Map<string, PendingRequest>;
+}
+
+export function imageFilenameForMime(mimeType: string): string {
   const map = {
     "image/jpeg": "image.jpg",
     "image/png": "image.png",
@@ -14,12 +24,12 @@ export function imageFilenameForMime(mimeType) {
 }
 
 export function buildRequestBody(
-  provider,
-  model,
-  text,
-  imageBase64,
-  imageMimeType
-) {
+  provider: string,
+  model: string | null,
+  text: string,
+  imageBase64: string | null,
+  imageMimeType: string | null
+): Record<string, unknown> {
   const instruction =
     "You are a helpful AI assistant. Respond using Markdown formatting where appropriate: use **bold**, *italic*, `inline code`, ```code blocks```, bullet lists, numbered lists, and headers. For short factual answers (a letter, number, or single word) just reply directly without extra markup.";
 
@@ -29,7 +39,7 @@ export function buildRequestBody(
 
   if (provider === "gemini") {
     const modelId = model || "gemini-3.1-pro-preview";
-    const parts = [];
+    const parts: Array<Record<string, unknown>> = [];
     parts.push({ text: instruction });
     if (imageBase64 && imageMimeType) {
       parts.push({
@@ -50,8 +60,11 @@ export function buildRequestBody(
   }
 
   if (provider === "openai" || provider === "openrouter") {
-    const messages = [{ role: "system", content: instruction }];
-    const userContent = [];
+    const messages: Array<{
+      role: string;
+      content: string | Array<Record<string, unknown>>;
+    }> = [{ role: "system", content: instruction }];
+    const userContent: Array<Record<string, unknown>> = [];
     if (imageBase64 && imageMimeType) {
       userContent.push({
         type: "image_url",
@@ -73,8 +86,11 @@ export function buildRequestBody(
 
   if (provider === "grok") {
     const selectedModel = model || "grok-4-fast-reasoning";
-    const messages = [{ role: "system", content: instruction }];
-    const userContent = [];
+    const messages: Array<{
+      role: string;
+      content: string | Array<Record<string, unknown>>;
+    }> = [{ role: "system", content: instruction }];
+    const userContent: Array<Record<string, unknown>> = [];
     if (imageBase64 && imageMimeType) {
       userContent.push({
         type: "image_url",
@@ -94,7 +110,7 @@ export function buildRequestBody(
   }
 
   if (provider === "anthropic") {
-    const userContent = [];
+    const userContent: Array<Record<string, unknown>> = [];
     if (imageBase64 && imageMimeType) {
       userContent.push({
         type: "image",
@@ -115,7 +131,7 @@ export function buildRequestBody(
   }
 
   if (provider === "opencode") {
-    const parts = [];
+    const parts: Array<Record<string, unknown>> = [];
     if (imageBase64 && imageMimeType) {
       parts.push({
         type: "file",
@@ -126,7 +142,7 @@ export function buildRequestBody(
     }
     parts.push({ type: "text", text: userText });
 
-    const body = {
+    const body: Record<string, unknown> = {
       system: instruction,
       parts
     };
@@ -153,7 +169,7 @@ export async function sendToAI({
   normalizeOpenCodeUrl,
   getPageSessionKey,
   pendingRequests
-}) {
+}: SendToAIOptions): Promise<string> {
   const { key: apiKey, provider, model } = settings;
   if (provider !== "opencode" && !apiKey) {
     throw new Error("API key not configured. Click ⚙️ to set up.");
@@ -172,7 +188,7 @@ export async function sendToAI({
   };
 
   const requestId = Math.random().toString(36).slice(2) + Date.now();
-  return new Promise((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     const timeout = setTimeout(() => {
       if (pendingRequests.has(requestId)) {
         pendingRequests.delete(requestId);
@@ -191,8 +207,8 @@ export async function sendToAI({
       }
     });
 
-    browser.runtime.sendMessage(
-      {
+    void browser.runtime
+      .sendMessage({
         type: "sendToAPI",
         requestId,
         apiKey,
@@ -200,20 +216,17 @@ export async function sendToAI({
         provider,
         opencodeConfig,
         pageKey: getPageSessionKey()
-      },
-      () => {
-        if (browser.runtime.lastError) {
-          const pending = pendingRequests.get(requestId);
-          if (pending) {
-            pendingRequests.delete(requestId);
-            pending.reject(
-              new Error(
-                "Could not reach background script. Try reloading the page."
-              )
-            );
-          }
+      })
+      .catch(() => {
+        const pending = pendingRequests.get(requestId);
+        if (pending) {
+          pendingRequests.delete(requestId);
+          pending.reject(
+            new Error(
+              "Could not reach background script. Try reloading the page."
+            )
+          );
         }
-      }
-    );
+      });
   });
 }

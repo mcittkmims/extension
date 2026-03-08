@@ -1,29 +1,49 @@
-// @ts-nocheck
 // Clipboard Manager - Popup script
-document.addEventListener("DOMContentLoaded", function () {
-  const newItemInput = document.getElementById("newItemInput");
-  const addBtn = document.getElementById("addBtn");
-  const historyList = document.getElementById("historyList");
-  const clearAllBtn = document.getElementById("clearAllBtn");
-  const toast = document.getElementById("toast");
 
-  const STORAGE_KEY = "clipboardHistory";
-  let toastTimer = null;
+const STORAGE_KEY = "clipboardHistory";
 
-  // ── Toast helper ─────────────────────────────────────────────────────────
-  function showToast(msg) {
-    toast.textContent = msg;
+function getById<T extends HTMLElement>(id: string): T {
+  const element = document.getElementById(id);
+  if (!element) {
+    throw new Error(`Missing element #${id}`);
+  }
+
+  return element as T;
+}
+
+async function loadHistory(): Promise<string[]> {
+  const result = (await browser.storage.local.get(STORAGE_KEY)) as Record<
+    string,
+    unknown
+  >;
+  return Array.isArray(result[STORAGE_KEY])
+    ? (result[STORAGE_KEY] as string[])
+    : [];
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const newItemInput = getById<HTMLInputElement>("newItemInput");
+  const addBtn = getById<HTMLButtonElement>("addBtn");
+  const historyList = getById<HTMLDivElement>("historyList");
+  const clearAllBtn = getById<HTMLButtonElement>("clearAllBtn");
+  const toast = getById<HTMLDivElement>("toast");
+
+  let toastTimer: number | null = null;
+
+  function showToast(message: string): void {
+    toast.textContent = message;
     toast.classList.add("show");
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () {
+    if (toastTimer) {
+      clearTimeout(toastTimer);
+    }
+    toastTimer = window.setTimeout(() => {
       toast.classList.remove("show");
     }, 1800);
   }
 
-  // ── Render history list ───────────────────────────────────────────────────
-  function renderHistory(items) {
+  function renderHistory(items: string[]): void {
     historyList.innerHTML = "";
-    items.forEach(function (text, idx) {
+    items.forEach((text, index) => {
       const item = document.createElement("div");
       item.className = "clip-item";
 
@@ -31,8 +51,8 @@ document.addEventListener("DOMContentLoaded", function () {
       span.className = "clip-text";
       span.textContent = text;
       span.title = text;
-      span.addEventListener("click", function () {
-        copyText(text);
+      span.addEventListener("click", () => {
+        void copyText(text);
       });
 
       const copyBtn = document.createElement("button");
@@ -40,100 +60,82 @@ document.addEventListener("DOMContentLoaded", function () {
       copyBtn.innerHTML =
         '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
       copyBtn.title = "Copy";
-      copyBtn.addEventListener("click", function () {
-        copyText(text);
+      copyBtn.addEventListener("click", () => {
+        void copyText(text);
       });
 
-      const delBtn = document.createElement("button");
-      delBtn.className = "clip-delete";
-      delBtn.innerHTML =
+      const deleteButton = document.createElement("button");
+      deleteButton.className = "clip-delete";
+      deleteButton.innerHTML =
         '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-      delBtn.title = "Remove";
-      delBtn.addEventListener("click", function () {
-        removeItem(idx);
+      deleteButton.title = "Remove";
+      deleteButton.addEventListener("click", () => {
+        void removeItem(index);
       });
 
-      item.appendChild(span);
-      item.appendChild(copyBtn);
-      item.appendChild(delBtn);
+      item.append(span, copyBtn, deleteButton);
       historyList.appendChild(item);
     });
   }
 
-  // ── Copy to system clipboard ──────────────────────────────────────────────
-  function copyText(text) {
-    navigator.clipboard
-      .writeText(text)
-      .then(function () {
-        showToast("Copied!");
-      })
-      .catch(function () {
-        showToast("Copy failed");
-      });
+  async function copyText(text: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Copied!");
+    } catch {
+      showToast("Copy failed");
+    }
   }
 
-  // ── Load from storage ─────────────────────────────────────────────────────
-  function loadHistory(cb) {
-    browser.storage.local.get([STORAGE_KEY], function (result) {
-      const items = result[STORAGE_KEY] || [];
-      cb(items);
-    });
-  }
-
-  loadHistory(renderHistory);
-
-  // ── Add item ──────────────────────────────────────────────────────────────
-  function addItem() {
+  async function addItem(): Promise<void> {
     const text = newItemInput.value.trim();
-    if (!text) return;
-    loadHistory(function (items) {
-      // Prepend, remove duplicates
-      const updated = [text].concat(
-        items.filter(function (i) {
-          return i !== text;
-        })
-      );
-      browser.storage.local.set({ [STORAGE_KEY]: updated }, function () {
-        newItemInput.value = "";
-        renderHistory(updated);
-        showToast("Saved!");
-      });
-    });
+    if (!text) {
+      return;
+    }
+
+    const items = await loadHistory();
+    const updated = [text, ...items.filter((item) => item !== text)];
+    await browser.storage.local.set({ [STORAGE_KEY]: updated });
+    newItemInput.value = "";
+    renderHistory(updated);
+    showToast("Saved!");
   }
 
-  addBtn.addEventListener("click", addItem);
-  newItemInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") addItem();
-  });
-
-  // ── Remove single item ────────────────────────────────────────────────────
-  function removeItem(idx) {
-    loadHistory(function (items) {
-      items.splice(idx, 1);
-      browser.storage.local.set({ [STORAGE_KEY]: items }, function () {
-        renderHistory(items);
-      });
-    });
+  async function removeItem(index: number): Promise<void> {
+    const items = await loadHistory();
+    items.splice(index, 1);
+    await browser.storage.local.set({ [STORAGE_KEY]: items });
+    renderHistory(items);
   }
 
-  // ── Clear all + reset appearance ──────────────────────────────────────────
-  clearAllBtn.addEventListener("click", function () {
-    browser.storage.local.set(
-      {
-        [STORAGE_KEY]: [],
-        chatOpacity: 0.95,
-        btnOpacity: 0.25,
-        chatWidth: 320,
-        chatHeight: 480
-      },
-      function () {
-        renderHistory([]);
-        showToast("Clipboard cleared!");
-      }
-    );
-    browser.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      if (tabs[0])
-        browser.tabs.sendMessage(tabs[0].id, { type: "resetPosition" });
-    });
+  addBtn.addEventListener("click", () => {
+    void addItem();
   });
+
+  newItemInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      void addItem();
+    }
+  });
+
+  clearAllBtn.addEventListener("click", async () => {
+    await browser.storage.local.set({
+      [STORAGE_KEY]: [],
+      chatOpacity: 0.95,
+      btnOpacity: 0.25,
+      chatWidth: 320,
+      chatHeight: 480
+    });
+    renderHistory([]);
+    showToast("Clipboard cleared!");
+    const tabs = await browser.tabs.query({
+      active: true,
+      currentWindow: true
+    });
+    if (tabs[0]?.id !== undefined) {
+      void browser.tabs.sendMessage(tabs[0].id, { type: "resetPosition" });
+    }
+  });
+
+  void loadHistory().then(renderHistory);
 });
