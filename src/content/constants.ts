@@ -62,21 +62,3 @@ export const PROVIDER_LABELS: Record<string, string> = {
 export function getProviderLabel(provider: string): string {
   return PROVIDER_LABELS[provider] || provider;
 }
-
-export function getProviderPlaceholder(provider: string): string {
-  switch (provider) {
-    case "openai":
-      return "Ask GPT or paste an image...";
-    case "anthropic":
-      return "Ask Claude or paste an image...";
-    case "grok":
-      return "Ask Grok or paste an image...";
-    case "openrouter":
-      return "Ask via OpenRouter or paste an image...";
-    case "opencode":
-      return "Message OpenCode or paste an image...";
-    case "gemini":
-    default:
-      return "Ask Gemini or paste an image...";
-  }
-}
