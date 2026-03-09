@@ -609,7 +609,9 @@
 .ai-input-area {
   background: var(--ai-bg);
   border-top: 1px solid var(--ai-border);
+  border-radius: 0 0 10px 10px;
   flex-shrink: 0;
+  padding-bottom: 10px;
   transition: background 0.15s;
 }
 .ai-input-area.dragover {
@@ -627,9 +629,14 @@
   padding-inline: 8px;
 }
 .ai-provider-status {
+  flex: 1;
+  min-width: 0;
   color: var(--ai-muted-soft);
   font-size: 10px;
+  overflow: hidden;
   text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Image Preview - inline above input */
@@ -667,18 +674,22 @@
 /* ─── Input Row ─────────────────────────────────────────────────────────── */
 .ai-input-row {
   display: flex;
-  padding: 10px;
+  padding: 10px 10px 0;
   gap: 6px;
 }
 .ai-input-row textarea {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
   resize: none;
-  white-space: pre-wrap;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ai-input-row textarea::placeholder {
   color: var(--ai-muted-soft);
   opacity: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ai-btn {
   flex-shrink: 0;

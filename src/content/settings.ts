@@ -1,8 +1,7 @@
 import {
   OPENCODE_DEFAULT_URL,
   PROVIDER_MODELS,
-  getProviderLabel,
-  getProviderPlaceholder
+  getProviderLabel
 } from "./constants";
 import type { LayoutController } from "./layout";
 import type {
@@ -76,7 +75,7 @@ export function updateComposerMetaUI(): void {
   const input = getById<HTMLTextAreaElement>("ai-chatbox-input");
 
   chip.textContent = info.providerLabel;
-  input.placeholder = getProviderPlaceholder(info.provider);
+  input.placeholder = `Message ${info.providerLabel} or paste image`;
   status.textContent = info.modelLabel;
 }
 
