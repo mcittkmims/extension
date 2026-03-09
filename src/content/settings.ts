@@ -193,7 +193,7 @@ export async function getApiKey(): Promise<StoredSettings> {
 
   return {
     key: (result.geminiApiKey as string | undefined) || null,
-    provider: (result.apiProvider as string | undefined) || "gemini",
+    provider: (result.apiProvider as string | undefined) || "aistudio",
     model: (result.apiModel as string | undefined) || null,
     opencodeUrl:
       (result.opencodeServerUrl as string | undefined) || OPENCODE_DEFAULT_URL,
@@ -289,7 +289,7 @@ export function createSettingsController({
     getById<HTMLInputElement>("ai-opencode-password").value =
       settings.opencodePassword;
 
-    const resolvedProvider = settings.provider || "gemini";
+    const resolvedProvider = settings.provider || "aistudio";
     getById<HTMLSelectElement>("ai-provider-select").value = resolvedProvider;
     await updateProviderModels(resolvedProvider, settings.model, {
       opencodeUrl: normalizeOpenCodeUrl(settings.opencodeUrl),

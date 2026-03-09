@@ -37,10 +37,9 @@ export function buildRequestBody(
     ? "Question: " + text
     : "What is the correct answer to this question shown in the image?";
 
-  if (provider === "gemini") {
+  if (provider === "aistudio" || provider === "vertex") {
     const modelId = model || "gemini-3.1-pro-preview";
     const parts: Array<Record<string, unknown>> = [];
-    parts.push({ text: instruction });
     if (imageBase64 && imageMimeType) {
       parts.push({
         inline_data: { mime_type: imageMimeType, data: imageBase64 }
@@ -49,7 +48,8 @@ export function buildRequestBody(
     parts.push({ text: userText });
     return {
       _geminiModel: modelId,
-      contents: [{ parts }],
+      systemInstruction: { parts: [{ text: instruction }] },
+      contents: [{ role: "user", parts }],
       generationConfig: {
         temperature: 0.1,
         topK: 1,

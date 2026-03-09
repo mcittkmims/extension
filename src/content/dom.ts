@@ -22,7 +22,8 @@ export function createOverlay() {
         <div class="ai-settings" id="ai-settings-panel">
             <label for="ai-provider-select">Provider</label>
             <select id="ai-provider-select">
-                <option value="gemini">Gemini (Google)</option>
+                <option value="aistudio">Google AI Studio</option>
+                <option value="vertex">Vertex AI (Google Cloud)</option>
                 <option value="openai">OpenAI (GPT)</option>
                 <option value="anthropic">Anthropic (Claude)</option>
                 <option value="openrouter">OpenRouter</option>
@@ -34,7 +35,7 @@ export function createOverlay() {
             <div id="ai-api-key-group">
                 <label for="ai-sync-key" class="mt">API Key</label>
                 <input type="password" id="ai-sync-key" placeholder="Enter API key...">
-                <small class="hint">Key for the selected AI provider</small>
+                <small class="hint" id="ai-api-key-hint">Key for the selected AI provider</small>
             </div>
             <div id="ai-opencode-group" class="hidden">
                 <label for="ai-opencode-url" class="mt">OpenCode Server URL</label>

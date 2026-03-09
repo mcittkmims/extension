@@ -38,6 +38,42 @@ export function callGemini(apiKey, requestBody) {
     });
 }
 
+// Google AI Studio — same endpoint as Gemini Developer API
+export function callAIStudio(apiKey, requestBody) {
+  return callGemini(apiKey, requestBody);
+}
+
+// Vertex AI Express Mode — uses aiplatform.googleapis.com with just an API key
+export function callVertexAI(apiKey, requestBody) {
+  const model = requestBody._geminiModel || "gemini-2.5-flash";
+  const body = Object.assign({}, requestBody);
+  delete body._geminiModel;
+
+  return fetch(
+    `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }
+  )
+    .then((response) => {
+      if (!response.ok) {
+        return response.text().then((text) => {
+          throw new Error(getProviderErrorMessage(text, response.status));
+        });
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+        const textPart = data.candidates[0].content.parts.find((p) => p.text);
+        if (textPart) return textPart.text;
+      }
+      throw new Error("No response generated");
+    });
+}
+
 function callChatCompletions(url, apiKey, requestBody, headers = {}) {
   return fetch(url, {
     method: "POST",

@@ -1,9 +1,10 @@
 import {
+  callAIStudio,
   callAnthropic,
-  callGemini,
   callGrok,
   callOpenAI,
-  callOpenRouter
+  callOpenRouter,
+  callVertexAI
 } from "./providers";
 import {
   callOpenCode,
@@ -28,7 +29,7 @@ export function setupRuntimeMessages(): void {
         .get(["geminiApiKey", "apiProvider"])
         .then((result) => ({
           syncKey: (result.geminiApiKey as string | undefined) || null,
-          provider: (result.apiProvider as string | undefined) || "gemini"
+          provider: (result.apiProvider as string | undefined) || "aistudio"
         }));
     }
 
@@ -76,7 +77,7 @@ export function setupRuntimeMessages(): void {
       return undefined;
     }
 
-    const selectedProvider = request.provider || "gemini";
+    const selectedProvider = request.provider || "aistudio";
     let apiCall: Promise<string>;
     switch (selectedProvider) {
       case "openai":
@@ -98,9 +99,12 @@ export function setupRuntimeMessages(): void {
           request.pageKey
         );
         break;
-      case "gemini":
+      case "vertex":
+        apiCall = callVertexAI(request.apiKey || "", request.requestBody);
+        break;
+      case "aistudio":
       default:
-        apiCall = callGemini(request.apiKey || "", request.requestBody);
+        apiCall = callAIStudio(request.apiKey || "", request.requestBody);
         break;
     }
 

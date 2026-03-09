@@ -1,16 +1,19 @@
 export { OPENCODE_DEFAULT_URL } from "../shared/opencode";
 
+const GEMINI_MODELS = [
+  {
+    value: "gemini-3.1-pro-preview",
+    label: "Gemini 3.1 Pro Preview (latest)"
+  },
+  { value: "gemini-3-flash-preview", label: "Gemini 3 Flash Preview" },
+  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro (stable)" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (stable)" },
+  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite" }
+];
+
 export const PROVIDER_MODELS = {
-  gemini: [
-    {
-      value: "gemini-3.1-pro-preview",
-      label: "Gemini 3.1 Pro Preview (latest)"
-    },
-    { value: "gemini-3-flash-preview", label: "Gemini 3 Flash Preview" },
-    { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro (stable)" },
-    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (stable)" },
-    { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite" }
-  ],
+  aistudio: GEMINI_MODELS,
+  vertex: GEMINI_MODELS,
   openai: [
     { value: "gpt-5.2", label: "GPT-5.2 (latest)" },
     { value: "gpt-5.2-pro", label: "GPT-5.2 Pro" },
@@ -51,7 +54,8 @@ export const PROVIDER_MODELS = {
 };
 
 export const PROVIDER_LABELS: Record<string, string> = {
-  gemini: "Gemini",
+  aistudio: "AI Studio",
+  vertex: "Vertex AI",
   openai: "OpenAI",
   anthropic: "Anthropic",
   openrouter: "OpenRouter",
