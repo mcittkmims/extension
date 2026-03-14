@@ -53,6 +53,7 @@ export function bindRuntimeEvents({
   document.addEventListener("keydown", (event) => {
     if (
       !event.altKey ||
+      event.shiftKey ||
       event.ctrlKey ||
       event.metaKey ||
       event.code !== "KeyQ"
@@ -67,6 +68,26 @@ export function bindRuntimeEvents({
 
     event.preventDefault();
     void chat.runQuizScreenshot();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (
+      !event.altKey ||
+      !event.shiftKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.code !== "KeyQ"
+    ) {
+      return;
+    }
+
+    const active = document.activeElement;
+    if (!chatbox.contains(active) && isEditableTarget(active)) {
+      return;
+    }
+
+    event.preventDefault();
+    void chat.runQuizAutofill();
   });
 
   const darkObserver = new MutationObserver(theme.updateDarkMode);

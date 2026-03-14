@@ -146,6 +146,7 @@ export function bindDragEvents({
       void browser.storage.local.set({
         [posKey]: { left: aiButton.offsetLeft, top: aiButton.offsetTop }
       });
+      state.dragMoved = false;
       return;
     }
 
