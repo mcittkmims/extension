@@ -145,7 +145,8 @@ export async function startContentApp(): Promise<void> {
       close: overlay.closeChatbox,
       send: chatController.send,
       reset: chatController.reset,
-      runQuizScreenshot: quiz.runScreenshotQuiz
+      runQuizScreenshot: quiz.runScreenshotQuiz,
+      runQuizAutofill: quiz.runAutoFillQuiz
     },
     settings: {
       toggle: overlay.toggleSettings,
