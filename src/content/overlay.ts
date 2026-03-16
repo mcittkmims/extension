@@ -27,6 +27,23 @@ export function createOverlayController({
   let normalizeViewportState:
     | ((options?: { persist?: boolean }) => void)
     | null = null;
+  // Listen for cross-tab changes to the chat open state
+  try {
+    browser.storage.onChanged.addListener((changes, area) => {
+      if (area !== "local") return;
+      if (!Object.prototype.hasOwnProperty.call(changes, "aiChatOpen")) return;
+      const newVal = Boolean(changes.aiChatOpen.newValue);
+      if (newVal === state.isOpen) return;
+      state.isOpen = newVal;
+      chatbox.classList.toggle("open", state.isOpen);
+      aiButton.classList.toggle("active", state.isOpen);
+      if (state.isOpen && normalizeViewportState) {
+        normalizeViewportState({ persist: true });
+      }
+    });
+  } catch (e) {
+    // best-effort: storage.onChanged may not be available in some test contexts
+  }
 
   return {
     attachLayout(controller: {
@@ -42,12 +59,36 @@ export function createOverlayController({
       if (state.isOpen && normalizeViewportState) {
         normalizeViewportState({ persist: true });
       }
+      try {
+        void browser.storage.local.set({ aiChatOpen: state.isOpen });
+      } catch (e) {
+        // ignore
+      }
     },
 
     closeChatbox(): void {
       state.isOpen = false;
       chatbox.classList.remove("open");
       aiButton.classList.remove("active");
+      try {
+        void browser.storage.local.set({ aiChatOpen: false });
+      } catch (e) {
+        // ignore
+      }
+    },
+
+    setOpen(open: boolean): void {
+      state.isOpen = Boolean(open);
+      chatbox.classList.toggle("open", state.isOpen);
+      aiButton.classList.toggle("active", state.isOpen);
+      if (state.isOpen && normalizeViewportState) {
+        normalizeViewportState({ persist: true });
+      }
+      try {
+        void browser.storage.local.set({ aiChatOpen: state.isOpen });
+      } catch (e) {
+        // ignore
+      }
     },
 
     toggleSettings(): void {

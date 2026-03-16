@@ -83,6 +83,17 @@ export async function startContentApp(): Promise<void> {
     state
   });
 
+  // Initialize chat open state from storage so it's synced across tabs
+  try {
+    const st = await browser.storage.local.get("aiChatOpen");
+    const shouldOpen = Boolean(st.aiChatOpen);
+    if (typeof overlay.setOpen === "function") {
+      overlay.setOpen(shouldOpen);
+    }
+  } catch (e) {
+    // ignore
+  }
+
   const layout = createLayoutController({
     posKey: POSITION_STORAGE_KEY,
     elements,
@@ -171,4 +182,29 @@ export async function startContentApp(): Promise<void> {
   theme.updateDarkMode();
   await messages.loadHistory();
   await Promise.all([settings.load(), loadKaTeX()]);
+
+  // Sync chat size from storage when the tab becomes active/visible
+  async function syncChatSizeFromStorage(): Promise<void> {
+    try {
+      const result = await browser.storage.local.get(["chatWidth", "chatHeight"]);
+      const w = typeof result.chatWidth === "number" ? result.chatWidth : null;
+      const h = typeof result.chatHeight === "number" ? result.chatHeight : null;
+      if (typeof w === "number" && typeof h === "number") {
+        layout.applyChatSize(w, h);
+        layout.normalizeViewportState();
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  window.addEventListener("focus", () => {
+    void syncChatSizeFromStorage();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void syncChatSizeFromStorage();
+  });
+  window.addEventListener("pageshow", () => {
+    void syncChatSizeFromStorage();
+  });
 }

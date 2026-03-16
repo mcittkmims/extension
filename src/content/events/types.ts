@@ -33,6 +33,7 @@ export interface EventBindingsOptions {
       minHeight: number;
       maxHeight: number;
     };
+    applyChatSize?: (width: number, height: number) => { width: number; height: number };
   };
   theme: {
     updateDarkMode: () => void;
