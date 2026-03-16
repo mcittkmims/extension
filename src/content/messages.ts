@@ -45,6 +45,7 @@ export function createMessageController(
     chatbox,
     ".ai-messages"
   );
+  const scrollKey = `${storageKey}_scrollTop`;
   let history: StoredChatEntry[] = [];
   let activeSignature = "";
   let isLoading = false;
@@ -130,6 +131,20 @@ export function createMessageController(
     void browser.storage.local.set({ [storageKey]: history });
   }
 
+  // Persist scroll position (throttled)
+  let lastScrollSync = 0;
+  const SCROLL_THROTTLE = 100;
+  function persistScrollTop() {
+    const now = Date.now();
+    if (now - lastScrollSync < SCROLL_THROTTLE) return;
+    lastScrollSync = now;
+    void browser.storage.local.set({ [scrollKey]: messagesContainer.scrollTop });
+  }
+
+  messagesContainer.addEventListener("scroll", () => {
+    persistScrollTop();
+  });
+
   function appendDivider(
     text: string,
     signature: string,
@@ -140,6 +155,7 @@ export function createMessageController(
     divider.textContent = text;
     messagesContainer.appendChild(divider);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    persistScrollTop();
 
     activeSignature = signature;
     if (persist) {
@@ -173,6 +189,7 @@ export function createMessageController(
 
     messagesContainer.appendChild(messageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    persistScrollTop();
 
     if (persist) {
       history.push({
@@ -196,6 +213,7 @@ export function createMessageController(
       '<div class="ai-typing"><span></span><span></span><span></span></div>';
     messagesContainer.appendChild(loadingDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    persistScrollTop();
   }
 
   function hideLoading(): void {
@@ -262,14 +280,31 @@ export function createMessageController(
     }, []);
 
     applyHistory(nextHistory);
+    // apply stored scroll position if present
+    try {
+      const r = await browser.storage.local.get(scrollKey);
+      const top = typeof r[scrollKey] === "number" ? r[scrollKey] : null;
+      if (typeof top === "number") {
+        messagesContainer.scrollTop = top;
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
   browser.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "local" || !(storageKey in changes)) {
+    if (areaName !== "local") return;
+    if (storageKey in changes) {
+      void loadHistory();
       return;
     }
-
-    void loadHistory();
+    if (scrollKey in changes) {
+      const newVal = changes[scrollKey].newValue;
+      if (typeof newVal === "number") {
+        messagesContainer.scrollTop = newVal;
+      }
+      return;
+    }
   });
 
   return {

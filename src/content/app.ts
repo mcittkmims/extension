@@ -200,11 +200,13 @@ export async function startContentApp(): Promise<void> {
 
   window.addEventListener("focus", () => {
     void syncChatSizeFromStorage();
+    void messages.loadHistory();
   });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) void syncChatSizeFromStorage();
   });
   window.addEventListener("pageshow", () => {
     void syncChatSizeFromStorage();
+    void messages.loadHistory();
   });
 }
