@@ -69,6 +69,16 @@ export function setupRuntimeMessages(): void {
         }));
     }
 
+    if (request.type === "openTikTok") {
+      return browser.tabs
+        .create({ url: "https://www.tiktok.com" })
+        .then(() => ({ success: true }))
+        .catch((error: unknown) => ({
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }));
+    }
+
     if (
       request.type !== "sendToAPI" ||
       !request.requestId ||

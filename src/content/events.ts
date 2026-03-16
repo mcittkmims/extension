@@ -15,7 +15,7 @@ export function bindOverlayEvents({
   images
 }: EventBindingsOptions): void {
   bindDragEvents({ elements, state, posKey, chat, settings, layout });
-  bindRuntimeEvents({ elements, state, chat, layout, theme });
+  bindRuntimeEvents({ elements, state, chat, layout, theme, settings });
   bindSettingsEvents({ elements, state, chat, settings, images });
   bindImageEvents({ elements, state, images });
 }
