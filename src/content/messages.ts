@@ -145,6 +145,27 @@ export function createMessageController(
     persistScrollTop();
   });
 
+  // Ensure scroll position is saved on unload/navigation
+  function immediatePersistScrollTop() {
+    try {
+      void browser.storage.local.set({ [scrollKey]: messagesContainer.scrollTop });
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  window.addEventListener("beforeunload", immediatePersistScrollTop, {
+    capture: true,
+    passive: true
+  });
+  window.addEventListener("pagehide", immediatePersistScrollTop, {
+    capture: true,
+    passive: true
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) immediatePersistScrollTop();
+  });
+
   function appendDivider(
     text: string,
     signature: string,
