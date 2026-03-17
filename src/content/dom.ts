@@ -54,6 +54,30 @@ export function createOverlay() {
                 <input type="range" id="ai-btn-opacity-slider" min="5" max="100" step="5" value="60">
                 <span id="ai-btn-opacity-value" class="slider-value">60%</span>
             </div>
+            <div class="shortcuts-section mt">
+                <h4 class="shortcuts-title">Keyboard Shortcuts</h4>
+                <div class="shortcuts-grid" id="ai-shortcuts-grid">
+                    <label>Toggle Chat</label>
+                    <input type="text" id="ai-shortcut-toggleChat" readonly placeholder="Press shortcut">
+
+                    <label>Increase Opacity</label>
+                    <input type="text" id="ai-shortcut-increaseOpacity" readonly placeholder="Press shortcut">
+
+                    <label>Decrease Opacity</label>
+                    <input type="text" id="ai-shortcut-decreaseOpacity" readonly placeholder="Press shortcut">
+
+                    <label>Open TikTok</label>
+                    <input type="text" id="ai-shortcut-openTikTok" readonly placeholder="Press shortcut">
+
+                    <label>Quiz Screenshot</label>
+                    <input type="text" id="ai-shortcut-runQuizScreenshot" readonly placeholder="Press shortcut">
+                </div>
+                <div class="shortcuts-hint"><small class="hint">Click a field and press the desired key combination. Conflicts will be shown.</small></div>
+                <div class="shortcuts-actions" style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+                    <button class="ai-btn" id="ai-shortcuts-reset" title="Reset shortcuts">Reset to defaults</button>
+                    <div id="ai-shortcut-announce" class="visually-hidden" role="status" aria-live="polite"></div>
+                </div>
+            </div>
         </div>
         <div class="ai-messages"></div>
         <div class="ai-input-area" id="ai-dropzone">
