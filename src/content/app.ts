@@ -198,6 +198,38 @@ export async function startContentApp(): Promise<void> {
     }
   }
 
+  // Sync opacity (chat + button) from storage when tab becomes active or when other tabs change it
+  async function syncOpacityFromStorage(): Promise<void> {
+    try {
+      const result = await browser.storage.local.get(["chatOpacity", "btnOpacity"]);
+      const chatOp = typeof result.chatOpacity === "number" ? result.chatOpacity : null;
+      const btnOp = typeof result.btnOpacity === "number" ? result.btnOpacity : null;
+      if (typeof chatOp === "number") {
+        chatbox.style.opacity = String(chatOp);
+        const slider = document.getElementById("ai-opacity-slider") as HTMLInputElement | null;
+        const value = document.getElementById("ai-opacity-value") as HTMLElement | null;
+        if (slider) slider.value = String(Math.round(chatOp * 100));
+        if (value) value.textContent = `${Math.round(chatOp * 100)}%`;
+      }
+      if (typeof btnOp === "number") {
+        aiButton.style.opacity = String(btnOp);
+        const btnSlider = document.getElementById("ai-btn-opacity-slider") as HTMLInputElement | null;
+        const btnValue = document.getElementById("ai-btn-opacity-value") as HTMLElement | null;
+        if (btnSlider) btnSlider.value = String(Math.round(btnOp * 100));
+        if (btnValue) btnValue.textContent = `${Math.round(btnOp * 100)}%`;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    if (Object.prototype.hasOwnProperty.call(changes, "chatOpacity") || Object.prototype.hasOwnProperty.call(changes, "btnOpacity")) {
+      void syncOpacityFromStorage();
+    }
+  });
+
   window.addEventListener("focus", () => {
     void syncChatSizeFromStorage();
     void messages.loadHistory();
