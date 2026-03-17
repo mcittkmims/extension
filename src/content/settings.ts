@@ -15,6 +15,8 @@ import type {
 } from "./types";
 import { getById } from "./utils";
 import { normalizeOpenCodeUrl } from "../shared/opencode";
+import { loadShortcuts, formatShortcut, saveShortcut, saveShortcuts, DEFAULT_SHORTCUTS } from "./shortcuts";
+import type { ShortcutDef } from "./shortcuts";
 
 export { normalizeOpenCodeUrl } from "../shared/opencode";
 
@@ -241,6 +243,7 @@ export function createSettingsController({
 }: SettingsControllerOptions) {
   const { aiButton, chatbox } = elements;
   let layoutController: Pick<LayoutController, "applyChatSize"> | null = null;
+  let announcer: HTMLElement | null = null;
 
   async function updateProviderModels(
     provider: string,
@@ -318,6 +321,156 @@ export function createSettingsController({
     }
     updateComposerMetaUI();
     state.settingsLoaded = true;
+    // load shortcuts into UI
+    try {
+      const SHORTS = await loadShortcuts();
+      const map: Record<string, string> = {
+        toggleChat: "ai-shortcut-toggleChat",
+        increaseOpacity: "ai-shortcut-increaseOpacity",
+        decreaseOpacity: "ai-shortcut-decreaseOpacity",
+        openTikTok: "ai-shortcut-openTikTok",
+        runQuizScreenshot: "ai-shortcut-runQuizScreenshot"
+      };
+      for (const k of Object.keys(map)) {
+        const el = getById<HTMLInputElement>(map[k]);
+        const def = SHORTS[k] as ShortcutDef | undefined || null;
+        el.value = formatShortcut(def);
+        installShortcutCapture(el, k);
+      }
+      // reset button
+      const resetBtn = document.getElementById("ai-shortcuts-reset") as HTMLButtonElement | null;
+      announcer = document.getElementById("ai-shortcut-announce") as HTMLElement | null;
+      if (resetBtn) {
+        resetBtn.addEventListener("click", async () => {
+          await saveShortcuts(DEFAULT_SHORTCUTS as Record<string, ShortcutDef>);
+          // update inputs
+          const updated = await loadShortcuts();
+          for (const k of Object.keys(map)) {
+            const el = getById<HTMLInputElement>(map[k]);
+            el.value = formatShortcut(updated[k] as ShortcutDef | undefined || null);
+          }
+          if (announcer) announcer.textContent = "Shortcuts reset to defaults.";
+          const hintEl = document.querySelector(".shortcuts-hint small") as HTMLElement | null;
+          if (hintEl) hintEl.textContent = "Shortcuts reset to defaults.";
+          setTimeout(() => {
+            if (announcer) announcer.textContent = "";
+            if (hintEl) hintEl.textContent = "Click a field and press the desired key combination. Conflicts will be shown.";
+          }, 2500);
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function installShortcutCapture(input: HTMLInputElement, actionKey: string) {
+    let listener: (ev: KeyboardEvent) => void;
+    let interimMods = { alt: false, ctrl: false, shift: false, meta: false };
+    const hintEl = document.querySelector(".shortcuts-hint small") as HTMLElement | null;
+
+    input.addEventListener("focus", () => {
+      // mark capture active so runtime ignores shortcuts
+      (window as any).__SHORTCUT_CAPTURE_ACTIVE = true;
+      input.value = "...press keys";
+      interimMods = { alt: false, ctrl: false, shift: false, meta: false };
+
+      listener = (ev: KeyboardEvent) => {
+        ev.preventDefault();
+        // cancel on Escape
+        if (ev.key === "Escape") {
+          input.value = formatShortcut(null);
+          input.blur();
+          window.removeEventListener("keydown", listener, true);
+          return;
+        }
+
+        // update interim modifiers if only modifiers are pressed
+        const isModifier = /^(Shift|Control|Alt|Meta)/.test(ev.code);
+        if (isModifier) {
+          interimMods = {
+            alt: !!ev.altKey,
+            ctrl: !!ev.ctrlKey,
+            shift: !!ev.shiftKey,
+            meta: !!ev.metaKey
+          };
+          const preview: ShortcutDef = {
+            code: ev.code.replace(/(Left|Right)$/i, ""),
+            altKey: interimMods.alt,
+            ctrlKey: interimMods.ctrl,
+            shiftKey: interimMods.shift,
+            metaKey: interimMods.meta
+          };
+          input.value = formatShortcut(preview);
+          return; // wait for non-modifier
+        }
+
+        // non-modifier key pressed -> capture full combo
+        const def: ShortcutDef = {
+          code: ev.code,
+          altKey: !!ev.altKey,
+          ctrlKey: !!ev.ctrlKey,
+          shiftKey: !!ev.shiftKey,
+          metaKey: !!ev.metaKey
+        };
+
+        // check conflicts using helper
+        void loadShortcuts().then((cur) => {
+          import("./shortcuts").then((mod) => {
+            const friendly: Record<string, string> = {
+              toggleChat: "Toggle Chat",
+              increaseOpacity: "Increase Opacity",
+              decreaseOpacity: "Decrease Opacity",
+              openTikTok: "Open TikTok",
+              runQuizScreenshot: "Quiz Screenshot"
+            };
+            const other = mod.findConflict(cur, def, actionKey);
+            if (other) {
+              const conflictLabel = friendly[other] || other;
+              if (hintEl) hintEl.textContent = `Conflict with '${conflictLabel}'. Choose another combo.`;
+              if (announcer) announcer.textContent = `Shortcut conflicts with ${conflictLabel}.`;
+              input.value = formatShortcut(def) + " (conflict)";
+              setTimeout(() => {
+                if (announcer) announcer.textContent = "";
+              }, 2500);
+              // clear capture flag and stop
+              try { (window as any).__SHORTCUT_CAPTURE_ACTIVE = false; } catch (e) {}
+              return;
+            }
+            // save and show
+            void saveShortcut(actionKey, def).then(() => {
+              input.value = formatShortcut(def);
+              if (hintEl) hintEl.textContent = "";
+              if (announcer) announcer.textContent = `Shortcut saved for ${friendly[actionKey] || actionKey}.`;
+              setTimeout(() => {
+                if (announcer) announcer.textContent = "";
+              }, 1500);
+            });
+          });
+        }).finally(() => {
+          input.blur();
+          try {
+            window.removeEventListener("keydown", listener, true);
+          } catch (e) {
+            // ignore
+          }
+        });
+      };
+      window.addEventListener("keydown", listener, true);
+    });
+
+    input.addEventListener("blur", () => {
+      // clear capture active flag
+      try {
+        (window as any).__SHORTCUT_CAPTURE_ACTIVE = false;
+      } catch (e) {
+        // ignore
+      }
+      try {
+        window.removeEventListener("keydown", listener, true);
+      } catch (e) {
+        // ignore
+      }
+    });
   }
 
   function measurePanelHeight(): void {
@@ -342,6 +495,39 @@ export function createSettingsController({
       panel.classList.remove("visible");
     }
   }
+  function adjustChatOpacity(deltaPct: number): void {
+    try {
+      // eslint-disable-next-line no-console
+      // adjustChatOpacity called
+    } catch (e) {}
+    const slider = getById<HTMLInputElement>("ai-opacity-slider");
+    const valueEl = getById<HTMLSpanElement>("ai-opacity-value");
+    const current = parseInt(slider.value, 10) || Math.round((parseFloat(chatbox.style.opacity) || 0.95) * 100);
+    let next = current + deltaPct;
+    if (next > 100) next = 100;
+    if (next < 5) next = 5;
+    slider.value = String(next);
+    valueEl.textContent = `${next}%`;
+    chatbox.style.opacity = String(next / 100);
+    void autoSave();
+  }
+
+  function adjustBtnOpacity(deltaPct: number): void {
+    try {
+      // eslint-disable-next-line no-console
+      // adjustBtnOpacity called
+    } catch (e) {}
+    const slider = getById<HTMLInputElement>("ai-btn-opacity-slider");
+    const valueEl = getById<HTMLSpanElement>("ai-btn-opacity-value");
+    const current = parseInt(slider.value, 10) || Math.round((parseFloat(aiButton.style.opacity) || 0.25) * 100);
+    let next = current + deltaPct;
+    if (next > 100) next = 100;
+    if (next < 5) next = 5;
+    slider.value = String(next);
+    valueEl.textContent = `${next}%`;
+    aiButton.style.opacity = String(next / 100);
+    void autoSave();
+  }
 
   return {
     attachLayout(layout: Pick<LayoutController, "applyChatSize">) {
@@ -350,6 +536,8 @@ export function createSettingsController({
     updateProviderModels,
     load,
     autoSave,
+    adjustChatOpacity,
+    adjustBtnOpacity,
     measurePanelHeight
   };
 }
