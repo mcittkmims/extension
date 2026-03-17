@@ -1,5 +1,6 @@
 import type { EventBindingsOptions } from "./types";
 import { isEditableTarget } from "../utils";
+import { loadShortcuts, matchEvent } from "../shortcuts";
 
 export function bindRuntimeEvents({
   elements,
@@ -13,6 +14,19 @@ export function bindRuntimeEvents({
   "elements" | "state" | "chat" | "layout" | "theme" | "settings"
 >): void {
   const { chatbox } = elements;
+
+  try {
+  } catch (e) {}
+
+  // load shortcuts and keep in-memory copy
+  let SHORTCUTS: Record<string, any> = {};
+  void loadShortcuts().then((m) => (SHORTCUTS = m));
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    if (Object.prototype.hasOwnProperty.call(changes, "shortcuts")) {
+      void loadShortcuts().then((m) => (SHORTCUTS = m));
+    }
+  });
 
   const scheduleViewportNormalize = () => {
     if (state.viewportNormalizeTimer) {
@@ -33,93 +47,106 @@ export function bindRuntimeEvents({
   });
 
   document.addEventListener("keydown", (event) => {
-    if (
-      !event.altKey ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.code !== "KeyC"
-    ) {
-      return;
-    }
-
+    // ignore while capturing a shortcut in settings
+    if ((window as any).__SHORTCUT_CAPTURE_ACTIVE) return;
     const active = document.activeElement;
-    if (!chatbox.contains(active) && isEditableTarget(active)) {
+    if (!chatbox.contains(active) && isEditableTarget(active)) return;
+
+    // (debug logs removed)
+
+    // toggle chat
+    const tog = SHORTCUTS["toggleChat"] || null;
+    if (tog && matchEvent(event, tog)) {
+      event.preventDefault();
+      chat.toggle();
       return;
     }
 
-    event.preventDefault();
-    chat.toggle();
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (
-      !event.altKey ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.code !== "KeyQ"
-    ) {
+    // quiz screenshot
+    const quiz = SHORTCUTS["runQuizScreenshot"] || null;
+    if (quiz && matchEvent(event, quiz)) {
+      event.preventDefault();
+      void chat.runQuizScreenshot();
       return;
     }
 
-    const active = document.activeElement;
-    if (!chatbox.contains(active) && isEditableTarget(active)) {
-      return;
-    }
-
-    event.preventDefault();
-    void chat.runQuizScreenshot();
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (!event.altKey || event.ctrlKey || event.metaKey) {
-      return;
-    }
-
-    const active = document.activeElement;
-    if (!chatbox.contains(active) && isEditableTarget(active)) {
-      return;
-    }
-
-    const adjust = (deltaPct: number) => {
-      const computed = window.getComputedStyle(chatbox).opacity;
-      const current = Math.round((parseFloat(computed) || 0) * 100);
-      let next = current + deltaPct;
-      if (next > 100) next = 100;
-      if (next < 5) next = 5;
-      chatbox.style.opacity = String(next / 100);
-      const slider = document.getElementById("ai-opacity-slider") as HTMLInputElement | null;
-      const value = document.getElementById("ai-opacity-value") as HTMLElement | null;
-      if (slider) slider.value = String(next);
-      if (value) value.textContent = `${next}%`;
-      if (settings && typeof settings.autoSave === "function") {
-        void settings.autoSave();
+    // increase / decrease opacity
+    const inc = SHORTCUTS["increaseOpacity"] || null;
+    const dec = SHORTCUTS["decreaseOpacity"] || null;
+      if (inc && matchEvent(event, inc)) {
+      event.preventDefault();
+      if (settings && typeof settings.adjustChatOpacity === "function") {
+        settings.adjustChatOpacity(5);
+      } else if (typeof (window as any).__aiAdjustChatOpacity === "function") {
+        (window as any).__aiAdjustChatOpacity(5);
+      } else {
+        // DOM fallback: update slider and dispatch input event
+        try {
+          const slider = document.getElementById("ai-opacity-slider") as HTMLInputElement | null;
+          if (slider) {
+            const cur = parseInt(slider.value, 10) || 95;
+            let next = cur + 5;
+            if (next > 100) next = 100;
+            if (next < 5) next = 5;
+            slider.value = String(next);
+            slider.dispatchEvent(new Event("input", { bubbles: true }));
+          } else {
+            // last resort: set chatbox style directly
+            const chatboxEl = chatbox as HTMLElement | null;
+            if (chatboxEl) {
+              const curOp = parseFloat(chatboxEl.style.opacity || "0.95") || 0.95;
+              let nextOp = Math.min(1, curOp + 0.05);
+              chatboxEl.style.opacity = String(nextOp);
+            }
+          }
+        } catch (e) {
+          // best-effort
+        }
       }
-    };
-
-    if (event.code === "KeyJ") {
-      event.preventDefault();
-      adjust(5);
-    } else if (event.code === "KeyK") {
-      event.preventDefault();
-      adjust(-5);
+      return;
     }
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (!event.altKey || event.ctrlKey || event.metaKey || event.code !== "Delete") {
+    if (dec && matchEvent(event, dec)) {
+      event.preventDefault();
+      if (settings && typeof settings.adjustChatOpacity === "function") {
+        settings.adjustChatOpacity(-5);
+      } else if (typeof (window as any).__aiAdjustChatOpacity === "function") {
+        (window as any).__aiAdjustChatOpacity(-5);
+      } else {
+        // DOM fallback: update slider and dispatch input event
+        try {
+          const slider = document.getElementById("ai-opacity-slider") as HTMLInputElement | null;
+          if (slider) {
+            const cur = parseInt(slider.value, 10) || 95;
+            let next = cur - 5;
+            if (next > 100) next = 100;
+            if (next < 5) next = 5;
+            slider.value = String(next);
+            slider.dispatchEvent(new Event("input", { bubbles: true }));
+          } else {
+            const chatboxEl = chatbox as HTMLElement | null;
+            if (chatboxEl) {
+              const curOp = parseFloat(chatboxEl.style.opacity || "0.95") || 0.95;
+              let nextOp = Math.max(0.05, curOp - 0.05);
+              chatboxEl.style.opacity = String(nextOp);
+            }
+          }
+        } catch (e) {
+          // best-effort
+        }
+      }
       return;
     }
 
-    const active = document.activeElement;
-    if (!chatbox.contains(active) && isEditableTarget(active)) {
+    // open TikTok
+    const ot = SHORTCUTS["openTikTok"] || null;
+    if (ot && matchEvent(event, ot)) {
+      event.preventDefault();
+      try {
+        void browser.runtime.sendMessage({ type: "openTikTok" });
+      } catch (e) {
+        // best-effort
+      }
       return;
-    }
-
-    event.preventDefault();
-    try {
-      void browser.runtime.sendMessage({ type: "openTikTok" });
-    } catch (e) {
-      // best-effort
     }
   });
 
