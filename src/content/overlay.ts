@@ -41,7 +41,7 @@ export function createOverlayController({
         normalizeViewportState({ persist: true });
       }
     });
-  } catch (e) {
+  } catch {
     // best-effort: storage.onChanged may not be available in some test contexts
   }
 
@@ -61,7 +61,7 @@ export function createOverlayController({
       }
       try {
         void browser.storage.local.set({ aiChatOpen: state.isOpen });
-      } catch (e) {
+      } catch {
         // ignore
       }
     },
@@ -72,7 +72,7 @@ export function createOverlayController({
       aiButton.classList.remove("active");
       try {
         void browser.storage.local.set({ aiChatOpen: false });
-      } catch (e) {
+      } catch {
         // ignore
       }
     },
@@ -86,7 +86,7 @@ export function createOverlayController({
       }
       try {
         void browser.storage.local.set({ aiChatOpen: state.isOpen });
-      } catch (e) {
+      } catch {
         // ignore
       }
     },

@@ -35,24 +35,40 @@ export function bindDragEvents({
   // Listen for chat size changes from other tabs and apply them
   browser.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
+    // Ignore size changes while this tab is actively resizing
+    if (state.isResizing || state.isDragging) return;
+
     const widthChanged = Object.prototype.hasOwnProperty.call(changes, "chatWidth");
     const heightChanged = Object.prototype.hasOwnProperty.call(changes, "chatHeight");
     if (!widthChanged && !heightChanged) return;
 
-    // Read the current values and apply size without triggering another save
-    void browser.storage.local
-      .get(["chatWidth", "chatHeight"])
-      .then((result) => {
-        const w = typeof result.chatWidth === "number" ? result.chatWidth : undefined;
-        const h = typeof result.chatHeight === "number" ? result.chatHeight : undefined;
-        if (typeof w === "number" && typeof h === "number") {
-          layout.applyChatSize(w, h);
-          layout.normalizeViewportState();
-        }
-      })
-      .catch(() => {
-        /* ignore */
-      });
+    // Use values directly from changes to avoid redundant storage read
+    const w = widthChanged && typeof changes.chatWidth.newValue === "number"
+      ? changes.chatWidth.newValue
+      : undefined;
+    const h = heightChanged && typeof changes.chatHeight.newValue === "number"
+      ? changes.chatHeight.newValue
+      : undefined;
+
+    // If one dimension is missing from changes, read it from storage
+    if ((widthChanged || heightChanged) && (w === undefined || h === undefined)) {
+      void browser.storage.local
+        .get(["chatWidth", "chatHeight"])
+        .then((result) => {
+          const width = typeof w === "number" ? w : (typeof result.chatWidth === "number" ? result.chatWidth : undefined);
+          const height = typeof h === "number" ? h : (typeof result.chatHeight === "number" ? result.chatHeight : undefined);
+          if (typeof width === "number" && typeof height === "number") {
+            layout.applyChatSize(width, height);
+            layout.normalizeViewportState();
+          }
+        })
+        .catch(() => {
+          /* ignore */
+        });
+    } else if (typeof w === "number" && typeof h === "number") {
+      layout.applyChatSize(w, h);
+      layout.normalizeViewportState();
+    }
   });
 
   aiButton.addEventListener("mousedown", (event) => {

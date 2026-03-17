@@ -149,7 +149,7 @@ export function createMessageController(
   function immediatePersistScrollTop() {
     try {
       void browser.storage.local.set({ [scrollKey]: messagesContainer.scrollTop });
-    } catch (e) {
+    } catch {
       // ignore
     }
   }
@@ -308,7 +308,7 @@ export function createMessageController(
       if (typeof top === "number") {
         messagesContainer.scrollTop = top;
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   }
@@ -317,14 +317,6 @@ export function createMessageController(
     if (areaName !== "local") return;
     if (storageKey in changes) {
       void loadHistory();
-      return;
-    }
-    if (scrollKey in changes) {
-      const newVal = changes[scrollKey].newValue;
-      if (typeof newVal === "number") {
-        messagesContainer.scrollTop = newVal;
-      }
-      return;
     }
   });
 

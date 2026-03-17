@@ -6,11 +6,10 @@ export function bindRuntimeEvents({
   state,
   chat,
   layout,
-  theme,
-  settings
+  theme
 }: Pick<
   EventBindingsOptions,
-  "elements" | "state" | "chat" | "layout" | "theme" | "settings"
+  "elements" | "state" | "chat" | "layout" | "theme"
 >): void {
   const { chatbox } = elements;
 
@@ -68,59 +67,6 @@ export function bindRuntimeEvents({
 
     event.preventDefault();
     void chat.runQuizScreenshot();
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (!event.altKey || event.ctrlKey || event.metaKey) {
-      return;
-    }
-
-    const active = document.activeElement;
-    if (!chatbox.contains(active) && isEditableTarget(active)) {
-      return;
-    }
-
-    const adjust = (deltaPct: number) => {
-      const computed = window.getComputedStyle(chatbox).opacity;
-      const current = Math.round((parseFloat(computed) || 0) * 100);
-      let next = current + deltaPct;
-      if (next > 100) next = 100;
-      if (next < 5) next = 5;
-      chatbox.style.opacity = String(next / 100);
-      const slider = document.getElementById("ai-opacity-slider") as HTMLInputElement | null;
-      const value = document.getElementById("ai-opacity-value") as HTMLElement | null;
-      if (slider) slider.value = String(next);
-      if (value) value.textContent = `${next}%`;
-      if (settings && typeof settings.autoSave === "function") {
-        void settings.autoSave();
-      }
-    };
-
-    if (event.code === "KeyJ") {
-      event.preventDefault();
-      adjust(5);
-    } else if (event.code === "KeyK") {
-      event.preventDefault();
-      adjust(-5);
-    }
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (!event.altKey || event.ctrlKey || event.metaKey || event.code !== "Delete") {
-      return;
-    }
-
-    const active = document.activeElement;
-    if (!chatbox.contains(active) && isEditableTarget(active)) {
-      return;
-    }
-
-    event.preventDefault();
-    try {
-      void browser.runtime.sendMessage({ type: "openTikTok" });
-    } catch (e) {
-      // best-effort
-    }
   });
 
   const darkObserver = new MutationObserver(theme.updateDarkMode);

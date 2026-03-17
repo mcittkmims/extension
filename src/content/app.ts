@@ -83,17 +83,6 @@ export async function startContentApp(): Promise<void> {
     state
   });
 
-  // Initialize chat open state from storage so it's synced across tabs
-  try {
-    const st = await browser.storage.local.get("aiChatOpen");
-    const shouldOpen = Boolean(st.aiChatOpen);
-    if (typeof overlay.setOpen === "function") {
-      overlay.setOpen(shouldOpen);
-    }
-  } catch (e) {
-    // ignore
-  }
-
   const layout = createLayoutController({
     posKey: POSITION_STORAGE_KEY,
     elements,
@@ -105,6 +94,18 @@ export async function startContentApp(): Promise<void> {
   });
   settings.attachLayout(layout);
   overlay.attachLayout(layout);
+
+  // Initialize chat open state from storage after attaching layout
+  // so that normalizeViewportState can be called if needed
+  try {
+    const st = await browser.storage.local.get("aiChatOpen");
+    const shouldOpen = Boolean(st.aiChatOpen);
+    if (typeof overlay.setOpen === "function") {
+      overlay.setOpen(shouldOpen);
+    }
+  } catch {
+    // ignore
+  }
   const chatController = createChatController({
     messages,
     image,
@@ -166,7 +167,8 @@ export async function startContentApp(): Promise<void> {
     layout: {
       normalizeViewportState: layout.normalizeViewportState,
       getViewportBounds: layout.getViewportBounds,
-      getChatSizeLimits: layout.getChatSizeLimits
+      getChatSizeLimits: layout.getChatSizeLimits,
+      applyChatSize: layout.applyChatSize
     },
     theme: {
       updateDarkMode: theme.updateDarkMode
@@ -182,63 +184,4 @@ export async function startContentApp(): Promise<void> {
   theme.updateDarkMode();
   await messages.loadHistory();
   await Promise.all([settings.load(), loadKaTeX()]);
-
-  // Sync chat size from storage when the tab becomes active/visible
-  async function syncChatSizeFromStorage(): Promise<void> {
-    try {
-      const result = await browser.storage.local.get(["chatWidth", "chatHeight"]);
-      const w = typeof result.chatWidth === "number" ? result.chatWidth : null;
-      const h = typeof result.chatHeight === "number" ? result.chatHeight : null;
-      if (typeof w === "number" && typeof h === "number") {
-        layout.applyChatSize(w, h);
-        layout.normalizeViewportState();
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  // Sync opacity (chat + button) from storage when tab becomes active or when other tabs change it
-  async function syncOpacityFromStorage(): Promise<void> {
-    try {
-      const result = await browser.storage.local.get(["chatOpacity", "btnOpacity"]);
-      const chatOp = typeof result.chatOpacity === "number" ? result.chatOpacity : null;
-      const btnOp = typeof result.btnOpacity === "number" ? result.btnOpacity : null;
-      if (typeof chatOp === "number") {
-        chatbox.style.opacity = String(chatOp);
-        const slider = document.getElementById("ai-opacity-slider") as HTMLInputElement | null;
-        const value = document.getElementById("ai-opacity-value") as HTMLElement | null;
-        if (slider) slider.value = String(Math.round(chatOp * 100));
-        if (value) value.textContent = `${Math.round(chatOp * 100)}%`;
-      }
-      if (typeof btnOp === "number") {
-        aiButton.style.opacity = String(btnOp);
-        const btnSlider = document.getElementById("ai-btn-opacity-slider") as HTMLInputElement | null;
-        const btnValue = document.getElementById("ai-btn-opacity-value") as HTMLElement | null;
-        if (btnSlider) btnSlider.value = String(Math.round(btnOp * 100));
-        if (btnValue) btnValue.textContent = `${Math.round(btnOp * 100)}%`;
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  browser.storage.onChanged.addListener((changes, area) => {
-    if (area !== "local") return;
-    if (Object.prototype.hasOwnProperty.call(changes, "chatOpacity") || Object.prototype.hasOwnProperty.call(changes, "btnOpacity")) {
-      void syncOpacityFromStorage();
-    }
-  });
-
-  window.addEventListener("focus", () => {
-    void syncChatSizeFromStorage();
-    void messages.loadHistory();
-  });
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) void syncChatSizeFromStorage();
-  });
-  window.addEventListener("pageshow", () => {
-    void syncChatSizeFromStorage();
-    void messages.loadHistory();
-  });
 }
