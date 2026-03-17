@@ -73,10 +73,16 @@ export async function startContentApp(): Promise<void> {
     ]);
   }
 
-  const settings = createSettingsController({
+  const settingsController = createSettingsController({
     elements,
     state
   });
+  // settingsController created
+  // expose helpers on window so runtime can call them reliably
+  try {
+    (window as any).__aiAdjustChatOpacity = settingsController.adjustChatOpacity;
+    (window as any).__aiAdjustBtnOpacity = settingsController.adjustBtnOpacity;
+  } catch (e) {}
   const overlay = createOverlayController({
     aiButton,
     chatbox,
@@ -100,10 +106,10 @@ export async function startContentApp(): Promise<void> {
     state,
     onResizeCornerChange: overlay.updateResizeCorner,
     onAutoSave() {
-      void settings.autoSave();
+      void settingsController.autoSave();
     }
   });
-  settings.attachLayout(layout);
+  settingsController.attachLayout(layout);
   overlay.attachLayout(layout);
   const chatController = createChatController({
     messages,
@@ -160,8 +166,10 @@ export async function startContentApp(): Promise<void> {
     },
     settings: {
       toggle: overlay.toggleSettings,
-      autoSave: settings.autoSave,
-      updateProviderModels: settings.updateProviderModels
+      autoSave: settingsController.autoSave,
+      updateProviderModels: settingsController.updateProviderModels,
+      adjustChatOpacity: settingsController.adjustChatOpacity,
+      adjustBtnOpacity: settingsController.adjustBtnOpacity
     },
     layout: {
       normalizeViewportState: layout.normalizeViewportState,
@@ -178,10 +186,10 @@ export async function startContentApp(): Promise<void> {
     }
   });
 
-  settings.measurePanelHeight();
+  settingsController.measurePanelHeight();
   theme.updateDarkMode();
   await messages.loadHistory();
-  await Promise.all([settings.load(), loadKaTeX()]);
+  await Promise.all([settingsController.load(), loadKaTeX()]);
 
   // Sync chat size from storage when the tab becomes active/visible
   async function syncChatSizeFromStorage(): Promise<void> {
