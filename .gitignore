@@ -6,3 +6,4 @@ web-ext-artifacts/
 node_modules/
 dist/
 .vite-build/
+package-lock.json
