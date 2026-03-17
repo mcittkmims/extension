@@ -19,6 +19,8 @@ export interface EventBindingsOptions {
       model: string | null,
       settings?: object
     ) => Promise<void>;
+    adjustChatOpacity?: (deltaPct: number) => void;
+    adjustBtnOpacity?: (deltaPct: number) => void;
   };
   layout: {
     normalizeViewportState: (options?: {
