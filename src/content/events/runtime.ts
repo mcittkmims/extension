@@ -11,7 +11,6 @@ export function bindRuntimeEvents({
   "elements" | "state" | "chat" | "layout" | "theme"
 >): void {
   const { chatbox } = elements;
-
   const scheduleViewportNormalize = () => {
     if (state.viewportNormalizeTimer) {
       clearTimeout(state.viewportNormalizeTimer);
@@ -72,6 +71,16 @@ export function bindRuntimeEvents({
 
     event.preventDefault();
     void chat.runQuizAutofill();
+  });
+
+  document.addEventListener("pointerdown", (event) => {
+    if (
+      state.isMobile &&
+      state.isOpen &&
+      !chatbox.contains(event.target as Node)
+    ) {
+      chat.close();
+    }
   });
 
   const darkObserver = new MutationObserver(theme.updateDarkMode);

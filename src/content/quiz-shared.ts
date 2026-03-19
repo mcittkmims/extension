@@ -46,7 +46,6 @@ export async function runQuizRequest(
   const { aiButton, chatbox } = elements;
   const context = await beforeSend();
   messages.ensureProviderContext(context);
-  messages.addUserMessage(userMessage);
   messages.showLoading();
 
   try {
@@ -70,6 +69,11 @@ export async function runQuizRequest(
       throw new Error(captured.error || "Screenshot failed");
     }
 
+    // Now that we have the screenshot, show the user message without the image
+    messages.hideLoading();
+    messages.addUserMessage(userMessage);
+    messages.showLoading();
+
     const response = await sendToAI(prompt, captured.base64, captured.mimeType);
     await onResponse?.(response);
 
@@ -80,6 +84,10 @@ export async function runQuizRequest(
     });
   } catch (error) {
     messages.hideLoading();
+    // Add user message without image if screenshot failed before sending
+    if (!document.querySelector(".ai-msg-user:last-child")) {
+      messages.addUserMessage(userMessage);
+    }
     messages.showError(error);
   }
 }

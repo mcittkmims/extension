@@ -7,17 +7,19 @@ export function setupLifecycle() {
     }
   });
 
-  browser.menus.removeAll().then(function () {
-    browser.menus.create({
-      id: "quiz-screenshot",
-      title: "Add to clipboard",
-      contexts: ["all"]
+  if (browser.menus) {
+    browser.menus.removeAll().then(function () {
+      browser.menus.create({
+        id: "quiz-screenshot",
+        title: "Add to clipboard",
+        contexts: ["all"]
+      });
     });
-  });
 
-  browser.menus.onClicked.addListener(function (info, tab) {
-    if (info.menuItemId === "quiz-screenshot" && tab && tab.id) {
-      browser.tabs.sendMessage(tab.id, { type: "quizScreenshot" });
-    }
-  });
+    browser.menus.onClicked.addListener(function (info, tab) {
+      if (info.menuItemId === "quiz-screenshot" && tab && tab.id) {
+        browser.tabs.sendMessage(tab.id, { type: "quizScreenshot" });
+      }
+    });
+  }
 }

@@ -29,6 +29,8 @@ const CHAT_HISTORY_STORAGE_KEY = "aiGlobalChatHistory";
 const CHAT_OPEN_STORAGE_KEY = "ai_chat_open";
 const SESSION_SCOPE_KEY = "global";
 
+import html2canvas from "html2canvas";
+
 export async function startContentApp(): Promise<void> {
   const elements = createOverlay();
   const { aiButton, chatbox } = elements;
@@ -36,6 +38,10 @@ export async function startContentApp(): Promise<void> {
   const theme = createThemeController(chatbox);
   const pendingRequests = new Map<string, PendingRequest>();
   const state = createOverlayState();
+  state.isMobile =
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    );
 
   const image = createImageController(state);
 
@@ -104,19 +110,50 @@ export async function startContentApp(): Promise<void> {
     resetConversation
   });
 
+  const captureTab = async () => {
+    try {
+      const response = await browser.runtime.sendMessage({
+        type: "captureTab"
+      });
+      if (response && response.success) {
+        return response;
+      }
+      throw new Error(response?.error || "Native capture failed");
+    } catch (e) {
+      console.warn("Falling back to html2canvas for screenshot", e);
+      try {
+        const canvas = await html2canvas(document.body, {
+          useCORS: true,
+          logging: false
+        });
+        const dataUrl = canvas.toDataURL("image/png");
+        return {
+          success: true,
+          base64: dataUrl.replace(/^data:image\/png;base64,/, ""),
+          mimeType: "image/png"
+        };
+      } catch {
+        return {
+          success: false,
+          error: "Both native and fallback capture failed."
+        };
+      }
+    }
+  };
+
   const quiz = createQuizController({
     elements,
     messages,
     beforeSend,
     sendToAI,
-    captureTab: () => browser.runtime.sendMessage({ type: "captureTab" })
+    captureTab
   });
   const quizAutofill = createQuizAutofillController({
     elements,
     messages,
     beforeSend,
     sendToAI,
-    captureTab: () => browser.runtime.sendMessage({ type: "captureTab" })
+    captureTab
   });
 
   layout.loadBtnPos((initialPosition) => {

@@ -7,6 +7,7 @@ interface StoredChatMessage {
   text: string;
   providerLabel?: string;
   modelLabel?: string;
+  imageBase64?: string | null;
 }
 
 interface StoredChatDivider {
@@ -65,7 +66,8 @@ export function createMessageController(
       messageA.role === messageB.role &&
       messageA.text === messageB.text &&
       messageA.providerLabel === messageB.providerLabel &&
-      messageA.modelLabel === messageB.modelLabel
+      messageA.modelLabel === messageB.modelLabel &&
+      messageA.imageBase64 === messageB.imageBase64
     );
   }
 
@@ -83,10 +85,16 @@ export function createMessageController(
       return;
     }
 
-    appendMessage(entry.text, entry.role === "user", false, {
-      providerLabel: entry.providerLabel || "",
-      modelLabel: entry.modelLabel || ""
-    });
+    appendMessage(
+      entry.text,
+      entry.role === "user",
+      false,
+      {
+        providerLabel: entry.providerLabel || "",
+        modelLabel: entry.modelLabel || ""
+      },
+      (entry as StoredChatMessage).imageBase64
+    );
   }
 
   function renderHistory(): void {
@@ -152,12 +160,30 @@ export function createMessageController(
     text: string,
     isUser: boolean,
     persist = true,
-    meta?: BotMessageMeta
+    meta?: BotMessageMeta,
+    imageBase64?: string | null
   ): void {
     const messageDiv = document.createElement("div");
     messageDiv.className = isUser ? "ai-msg ai-msg-user" : "ai-msg ai-msg-bot";
     if (isUser) {
-      messageDiv.textContent = text;
+      if (imageBase64) {
+        const img = document.createElement("img");
+        img.src = `data:image/png;base64,${imageBase64}`;
+        img.style.maxWidth = "100%";
+        img.style.borderRadius = "4px";
+        img.style.marginBottom = "8px";
+        img.style.cursor = "pointer";
+        img.onclick = () => {
+          const w = window.open("");
+          w?.document.write(
+            `<img src="data:image/png;base64,${imageBase64}" style="max-width:100%;" />`
+          );
+        };
+        messageDiv.appendChild(img);
+      }
+      const textDiv = document.createElement("div");
+      textDiv.textContent = text;
+      messageDiv.appendChild(textDiv);
     } else {
       if (meta?.providerLabel) {
         const badge = document.createElement("div");
@@ -180,7 +206,8 @@ export function createMessageController(
         role: isUser ? "user" : "bot",
         text,
         providerLabel: meta?.providerLabel,
-        modelLabel: meta?.modelLabel
+        modelLabel: meta?.modelLabel,
+        imageBase64
       });
       persistHistory();
     }
@@ -250,13 +277,16 @@ export function createMessageController(
           : undefined;
       const modelLabel =
         typeof entry.modelLabel === "string" ? entry.modelLabel : undefined;
+      const imageBase64 =
+        typeof entry.imageBase64 === "string" ? entry.imageBase64 : undefined;
 
       entries.push({
         type: "message",
         role,
         text,
         providerLabel,
-        modelLabel
+        modelLabel,
+        imageBase64
       });
       return entries;
     }, []);
