@@ -357,7 +357,7 @@ function selectDropdownOption(
   dropdown: DropdownSnapshot,
   responseLine: string
 ): void {
-  const numericMatch = responseLine.match(/\d+/);
+  const numericMatch = responseLine.trim().match(/^\d+$/);
   if (numericMatch) {
     const selectedNumber = Number.parseInt(numericMatch[0], 10);
     if (selectedNumber < 1 || selectedNumber > dropdown.options.length) {

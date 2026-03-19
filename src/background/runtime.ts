@@ -20,6 +20,7 @@ interface RuntimeRequest {
   opencodeConfig?: { baseUrl?: string; password?: string };
   pageKey?: string;
   requestId?: string;
+  keepContext?: boolean;
 }
 
 export function setupRuntimeMessages(): void {
@@ -96,7 +97,8 @@ export function setupRuntimeMessages(): void {
         apiCall = callOpenCode(
           request.opencodeConfig,
           request.requestBody,
-          request.pageKey
+          request.pageKey,
+          request.keepContext !== false
         );
         break;
       case "vertex":

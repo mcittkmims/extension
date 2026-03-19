@@ -23,6 +23,7 @@ import {
 import { createOverlayController } from "./overlay";
 import { createThemeController } from "./theme";
 import type { PendingRequest } from "./types";
+import type { ContextMessage } from "./messages";
 
 const POSITION_STORAGE_KEY = "ai_btn_pos";
 const CHAT_HISTORY_STORAGE_KEY = "aiGlobalChatHistory";
@@ -42,7 +43,8 @@ export async function startContentApp(): Promise<void> {
   async function sendToAI(
     text: string,
     imageBase64: string | null = null,
-    imageMimeType: string | null = null
+    imageMimeType: string | null = null,
+    contextMessages: ContextMessage[] = []
   ): Promise<string> {
     const settings = await getApiKey();
     return sendAIRequest({
@@ -50,14 +52,23 @@ export async function startContentApp(): Promise<void> {
       imageBase64,
       imageMimeType,
       settings,
+      contextMessages,
       getPageSessionKey: () => SESSION_SCOPE_KEY,
       pendingRequests
     });
   }
 
   async function beforeSend() {
+    const settings = await getApiKey();
+    const contextMessages = messages.getContextMessages();
+    if (!settings.keepContext) {
+      await messages.clear();
+    }
     updateComposerMetaUI();
-    return getSelectedProviderInfo();
+    return {
+      ...getSelectedProviderInfo(),
+      contextMessages
+    };
   }
 
   async function resetConversation(): Promise<void> {

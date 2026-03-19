@@ -6,6 +6,10 @@ export interface QuizProviderContext {
   modelLabel: string;
   badgeLabel: string;
   signature: string;
+  contextMessages: Array<{
+    role: "user" | "assistant";
+    text: string;
+  }>;
 }
 
 export interface QuizControllerOptions {
@@ -15,7 +19,11 @@ export interface QuizControllerOptions {
   sendToAI: (
     text: string,
     imageBase64?: string | null,
-    imageMimeType?: string | null
+    imageMimeType?: string | null,
+    contextMessages?: Array<{
+      role: "user" | "assistant";
+      text: string;
+    }>
   ) => Promise<string>;
   captureTab: () => Promise<CaptureTabResponse>;
 }
@@ -70,7 +78,12 @@ export async function runQuizRequest(
       throw new Error(captured.error || "Screenshot failed");
     }
 
-    const response = await sendToAI(prompt, captured.base64, captured.mimeType);
+    const response = await sendToAI(
+      prompt,
+      captured.base64,
+      captured.mimeType,
+      context.contextMessages
+    );
     await onResponse?.(response);
 
     messages.hideLoading();

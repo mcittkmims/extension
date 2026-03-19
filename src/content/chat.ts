@@ -10,11 +10,19 @@ interface ChatControllerOptions {
     modelLabel: string;
     badgeLabel: string;
     signature: string;
+    contextMessages: Array<{
+      role: "user" | "assistant";
+      text: string;
+    }>;
   }>;
   sendToAI: (
     text: string,
     imageBase64?: string | null,
-    imageMimeType?: string | null
+    imageMimeType?: string | null,
+    contextMessages?: Array<{
+      role: "user" | "assistant";
+      text: string;
+    }>
   ) => Promise<string>;
   resetConversation: () => Promise<void>;
 }
@@ -59,7 +67,8 @@ export function createChatController({
         const response = await sendToAI(
           text,
           attachment.base64,
-          attachment.mimeType
+          attachment.mimeType,
+          context.contextMessages
         );
         messages.hideLoading();
         messages.addBotMessage(response, {

@@ -45,6 +45,7 @@ export interface StoredSettings {
   key: string | null;
   provider: string;
   model: string | null;
+  keepContext: boolean;
   opencodeUrl: string;
   opencodePassword: string;
   opacity: number;

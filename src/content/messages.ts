@@ -26,9 +26,15 @@ interface ProviderContextMeta extends BotMessageMeta {
   signature: string;
 }
 
+export interface ContextMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
 export interface MessageController {
   loadHistory: () => Promise<void>;
   ensureProviderContext: (context: ProviderContextMeta) => void;
+  getContextMessages: () => ContextMessage[];
   addUserMessage: (text: string) => void;
   addBotMessage: (text: string, meta?: BotMessageMeta) => void;
   showLoading: () => void;
@@ -284,6 +290,27 @@ export function createMessageController(
         `${prefix} ${context.providerLabel} - ${context.modelLabel}`,
         context.signature
       );
+    },
+    getContextMessages() {
+      const lastDividerIndex = [...history]
+        .map((entry, index) => ({ entry, index }))
+        .reverse()
+        .find(({ entry }) => entry.type === "divider")?.index;
+
+      return history
+        .slice(lastDividerIndex == null ? 0 : lastDividerIndex + 1)
+        .flatMap<ContextMessage>((entry) => {
+          if (entry.type !== "message") {
+            return [];
+          }
+
+          return [
+            {
+              role: entry.role === "bot" ? "assistant" : "user",
+              text: entry.text
+            }
+          ];
+        });
     },
     addUserMessage(text) {
       appendMessage(text, true);

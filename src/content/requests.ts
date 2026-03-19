@@ -1,3 +1,4 @@
+import type { ContextMessage } from "./messages";
 import type { PendingRequest, StoredSettings } from "./types";
 import { normalizeOpenCodeUrl } from "../shared/opencode";
 
@@ -6,6 +7,7 @@ interface SendToAIOptions {
   imageBase64?: string | null;
   imageMimeType?: string | null;
   settings: StoredSettings;
+  contextMessages: ContextMessage[];
   getPageSessionKey: () => string;
   pendingRequests: Map<string, PendingRequest>;
 }
@@ -26,6 +28,8 @@ export function imageFilenameForMime(mimeType: string): string {
 export function buildRequestBody(
   provider: string,
   model: string | null,
+  contextMessages: ContextMessage[],
+  keepContext: boolean,
   text: string,
   imageBase64: string | null,
   imageMimeType: string | null
@@ -36,10 +40,21 @@ export function buildRequestBody(
   const userText = text
     ? "Question: " + text
     : "What is the correct answer to this question shown in the image?";
+  const previousMessages = keepContext ? contextMessages : [];
 
   if (provider === "aistudio" || provider === "vertex") {
     const modelId = model || "gemini-3.1-pro-preview";
-    const parts: Array<Record<string, unknown>> = [];
+    type GeminiPart =
+      | { text: string }
+      | { inline_data: { mime_type: string; data: string } };
+    const contents: Array<{
+      role: "user" | "model";
+      parts: GeminiPart[];
+    }> = previousMessages.map((message) => ({
+      role: message.role === "assistant" ? "model" : "user",
+      parts: [{ text: message.text }]
+    }));
+    const parts: GeminiPart[] = [];
     if (imageBase64 && imageMimeType) {
       parts.push({
         inline_data: { mime_type: imageMimeType, data: imageBase64 }
@@ -49,7 +64,7 @@ export function buildRequestBody(
     return {
       _geminiModel: modelId,
       systemInstruction: { parts: [{ text: instruction }] },
-      contents: [{ role: "user", parts }],
+      contents: contents.concat([{ role: "user", parts }]),
       generationConfig: {
         temperature: 0.1,
         topK: 1,
@@ -64,6 +79,9 @@ export function buildRequestBody(
       role: string;
       content: string | Array<Record<string, unknown>>;
     }> = [{ role: "system", content: instruction }];
+    previousMessages.forEach((message) => {
+      messages.push({ role: message.role, content: message.text });
+    });
     const userContent: Array<Record<string, unknown>> = [];
     if (imageBase64 && imageMimeType) {
       userContent.push({
@@ -90,6 +108,9 @@ export function buildRequestBody(
       role: string;
       content: string | Array<Record<string, unknown>>;
     }> = [{ role: "system", content: instruction }];
+    previousMessages.forEach((message) => {
+      messages.push({ role: message.role, content: message.text });
+    });
     const userContent: Array<Record<string, unknown>> = [];
     if (imageBase64 && imageMimeType) {
       userContent.push({
@@ -110,7 +131,24 @@ export function buildRequestBody(
   }
 
   if (provider === "anthropic") {
-    const userContent: Array<Record<string, unknown>> = [];
+    type AnthropicContent =
+      | {
+          type: "image";
+          source: {
+            type: "base64";
+            media_type: string;
+            data: string;
+          };
+        }
+      | { type: "text"; text: string };
+    const messages: Array<{
+      role: "user" | "assistant";
+      content: AnthropicContent[];
+    }> = previousMessages.map((message) => ({
+      role: message.role,
+      content: [{ type: "text", text: message.text }]
+    }));
+    const userContent: AnthropicContent[] = [];
     if (imageBase64 && imageMimeType) {
       userContent.push({
         type: "image",
@@ -126,7 +164,7 @@ export function buildRequestBody(
       model: model || "claude-sonnet-4-6",
       max_tokens: 2048,
       system: instruction,
-      messages: [{ role: "user", content: userContent }]
+      messages: messages.concat([{ role: "user", content: userContent }])
     };
   }
 
@@ -166,6 +204,7 @@ export async function sendToAI({
   imageBase64 = null,
   imageMimeType = null,
   settings,
+  contextMessages,
   getPageSessionKey,
   pendingRequests
 }: SendToAIOptions): Promise<string> {
@@ -177,6 +216,8 @@ export async function sendToAI({
   const requestBody = buildRequestBody(
     provider,
     model,
+    contextMessages,
+    settings.keepContext,
     text,
     imageBase64,
     imageMimeType
@@ -214,7 +255,8 @@ export async function sendToAI({
         requestBody,
         provider,
         opencodeConfig,
-        pageKey: getPageSessionKey()
+        pageKey: getPageSessionKey(),
+        keepContext: settings.keepContext
       })
       .catch(() => {
         const pending = pendingRequests.get(requestId);

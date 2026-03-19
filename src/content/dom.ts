@@ -20,6 +20,16 @@ export function createOverlay() {
             </div>
         </header>
         <div class="ai-settings" id="ai-settings-panel">
+            <label class="ai-toggle-row" for="ai-keep-context">
+                <span class="ai-toggle-copy">
+                    <span class="ai-toggle-label">Keep conversation context</span>
+                    <span class="hint">Turn off to auto-reset chat history before each request.</span>
+                </span>
+                <span class="ai-toggle-switch">
+                    <input type="checkbox" id="ai-keep-context" checked>
+                    <span class="ai-toggle-slider" aria-hidden="true"></span>
+                </span>
+            </label>
             <label for="ai-provider-select">Provider</label>
             <select id="ai-provider-select">
                 <option value="aistudio">Google AI Studio</option>

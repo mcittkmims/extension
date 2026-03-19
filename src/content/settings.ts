@@ -183,6 +183,7 @@ export async function getApiKey(): Promise<StoredSettings> {
     "geminiApiKey",
     "apiProvider",
     "apiModel",
+    "aiKeepContext",
     "opencodeServerUrl",
     "opencodePassword",
     "chatOpacity",
@@ -195,6 +196,8 @@ export async function getApiKey(): Promise<StoredSettings> {
     key: (result.geminiApiKey as string | undefined) || null,
     provider: (result.apiProvider as string | undefined) || "aistudio",
     model: (result.apiModel as string | undefined) || null,
+    keepContext:
+      typeof result.aiKeepContext === "boolean" ? result.aiKeepContext : true,
     opencodeUrl:
       (result.opencodeServerUrl as string | undefined) || OPENCODE_DEFAULT_URL,
     opencodePassword: (result.opencodePassword as string | undefined) || "",
@@ -210,6 +213,7 @@ export async function saveApiKey(
   key: string,
   provider: string,
   model: string,
+  keepContext: boolean,
   opencodeUrl: string,
   opencodePassword: string,
   opacity: number,
@@ -221,6 +225,7 @@ export async function saveApiKey(
     geminiApiKey: key,
     apiProvider: provider,
     apiModel: model,
+    aiKeepContext: keepContext,
     opencodeServerUrl: normalizeOpenCodeUrl(opencodeUrl),
     opencodePassword: opencodePassword || "",
     chatOpacity: opacity,
@@ -255,6 +260,7 @@ export function createSettingsController({
     const key = getById<HTMLInputElement>("ai-sync-key").value.trim();
     const provider = getById<HTMLSelectElement>("ai-provider-select").value;
     const model = getById<HTMLSelectElement>("ai-model-select").value;
+    const keepContext = getById<HTMLInputElement>("ai-keep-context").checked;
     const opacity =
       parseInt(getById<HTMLInputElement>("ai-opacity-slider").value, 10) / 100;
     const buttonOpacity =
@@ -264,6 +270,7 @@ export function createSettingsController({
       key,
       provider,
       model,
+      keepContext,
       normalizeOpenCodeUrl(getById<HTMLInputElement>("ai-opencode-url").value),
       getById<HTMLInputElement>("ai-opencode-password").value,
       opacity,
@@ -291,6 +298,7 @@ export function createSettingsController({
 
     const resolvedProvider = settings.provider || "aistudio";
     getById<HTMLSelectElement>("ai-provider-select").value = resolvedProvider;
+    getById<HTMLInputElement>("ai-keep-context").checked = settings.keepContext;
     await updateProviderModels(resolvedProvider, settings.model, {
       opencodeUrl: normalizeOpenCodeUrl(settings.opencodeUrl),
       opencodePassword: settings.opencodePassword

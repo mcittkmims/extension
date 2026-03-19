@@ -15,6 +15,7 @@ export function bindSettingsEvents({
   const providerSelect = getById<HTMLSelectElement>("ai-provider-select");
   const modelSelect = getById<HTMLSelectElement>("ai-model-select");
   const apiKeyInput = getById<HTMLInputElement>("ai-sync-key");
+  const keepContextInput = getById<HTMLInputElement>("ai-keep-context");
   const opencodePasswordInput = getById<HTMLInputElement>(
     "ai-opencode-password"
   );
@@ -43,6 +44,9 @@ export function bindSettingsEvents({
     void settings.autoSave();
   });
   apiKeyInput.addEventListener("blur", () => {
+    void settings.autoSave();
+  });
+  keepContextInput.addEventListener("change", () => {
     void settings.autoSave();
   });
 

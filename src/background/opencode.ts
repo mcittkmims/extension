@@ -27,7 +27,16 @@ interface OpenCodeSessionResponse {
 }
 
 interface OpenCodeMessageResponse {
+  info?: {
+    id?: string;
+  };
   parts?: OpenCodeTextPart[];
+}
+
+interface OpenCodeMessageListEntry {
+  info?: {
+    id?: string;
+  };
 }
 
 interface OpenCodeProvidersResponse {
@@ -250,10 +259,39 @@ function extractOpenCodeText(parts: OpenCodeTextPart[] | undefined): string {
     .trim();
 }
 
+async function pruneOpenCodeSession(
+  baseUrl: string,
+  password: string,
+  sessionId: string
+): Promise<void> {
+  const messages = await openCodeFetch<OpenCodeMessageListEntry[]>(
+    baseUrl,
+    password,
+    `/session/${encodeURIComponent(sessionId)}/message`,
+    { method: "GET" }
+  );
+
+  const firstMessageId = Array.isArray(messages) ? messages[0]?.info?.id : null;
+  if (!firstMessageId) {
+    return;
+  }
+
+  await openCodeFetch<boolean>(
+    baseUrl,
+    password,
+    `/session/${encodeURIComponent(sessionId)}/revert`,
+    {
+      method: "POST",
+      body: JSON.stringify({ messageID: firstMessageId })
+    }
+  );
+}
+
 export async function callOpenCode(
   opencodeConfig: OpenCodeConfig | undefined,
   requestBody: { parts?: unknown[] } | undefined,
-  pageKey: string | undefined
+  pageKey: string | undefined,
+  keepContext = true
 ): Promise<string> {
   const baseUrl = normalizeOpenCodeUrl(opencodeConfig?.baseUrl);
   const password = opencodeConfig?.password || "";
@@ -267,6 +305,10 @@ export async function callOpenCode(
 
   let sessionId = await ensureOpenCodeSession(baseUrl, password, scopedPageKey);
   let data: OpenCodeMessageResponse;
+
+  if (!keepContext) {
+    await pruneOpenCodeSession(baseUrl, password, sessionId);
+  }
 
   try {
     data = await openCodeFetch(
@@ -285,6 +327,7 @@ export async function callOpenCode(
 
     await clearOpenCodeSessionId(scopedPageKey);
     sessionId = await ensureOpenCodeSession(baseUrl, password, scopedPageKey);
+
     data = await openCodeFetch(
       baseUrl,
       password,
@@ -307,7 +350,8 @@ export async function callOpenCode(
 export async function restartOpenCodeSession(
   pageKey: string | undefined
 ): Promise<void> {
-  await clearOpenCodeSessionId(pageKey || "default");
+  const scopedPageKey = pageKey || "default";
+  await clearOpenCodeSessionId(scopedPageKey);
 }
 
 export async function getOpenCodeModels(
