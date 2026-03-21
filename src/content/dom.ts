@@ -44,7 +44,7 @@ export function createOverlay() {
             <select id="ai-model-select"></select>
             <div id="ai-api-key-group">
                 <label for="ai-sync-key" class="mt">API Key</label>
-                <input type="password" id="ai-sync-key" placeholder="Enter API key..." autocomplete="off">
+                <input type="text" id="ai-sync-key" placeholder="Enter API key..." autocomplete="off" style="-webkit-text-security:disc">
                 <small class="hint" id="ai-api-key-hint">Key for the selected AI provider</small>
             </div>
             <div id="ai-opencode-group" class="hidden">
