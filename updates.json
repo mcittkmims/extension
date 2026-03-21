@@ -77,6 +77,10 @@
         {
           "version": "4.2.0",
           "update_link": "https://github.com/mcittkmims/extension/releases/download/v4.2.0/extension.xpi"
+        },
+        {
+          "version": "4.2.1",
+          "update_link": "https://github.com/mcittkmims/extension/releases/download/v4.2.1/extension.xpi"
         }
       ]
     }
