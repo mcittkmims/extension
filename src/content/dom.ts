@@ -44,14 +44,14 @@ export function createOverlay() {
             <select id="ai-model-select"></select>
             <div id="ai-api-key-group">
                 <label for="ai-sync-key" class="mt">API Key</label>
-                <input type="password" id="ai-sync-key" placeholder="Enter API key...">
+                <input type="password" id="ai-sync-key" placeholder="Enter API key..." autocomplete="off">
                 <small class="hint" id="ai-api-key-hint">Key for the selected AI provider</small>
             </div>
             <div id="ai-opencode-group" class="hidden">
                 <label for="ai-opencode-url" class="mt">OpenCode Server URL</label>
                 <input type="text" id="ai-opencode-url" placeholder="http://127.0.0.1:4096">
                 <label for="ai-opencode-password" class="mt">Server Password (optional)</label>
-                <input type="password" id="ai-opencode-password" placeholder="OPENCODE_SERVER_PASSWORD">
+                <input type="password" id="ai-opencode-password" placeholder="OPENCODE_SERVER_PASSWORD" autocomplete="off">
                 <small class="hint" id="ai-opencode-status">Models load from your OpenCode server.</small>
             </div>
             <label for="ai-opacity-slider" class="mt">Chat Opacity</label>
