@@ -25,5 +25,8 @@
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.26.1",
     "vite": "^6.2.2"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1"
   }
 }
