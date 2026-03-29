@@ -28,8 +28,8 @@ export function bindDragEvents({
     }
   });
 
-  aiButton.addEventListener("mousedown", (event) => {
-    if (event.button !== 0) {
+  aiButton.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 && event.pointerType === "mouse") {
       return;
     }
 
@@ -39,28 +39,31 @@ export function bindDragEvents({
     state.dragStartY = event.clientY;
     state.btnStartLeft = aiButton.offsetLeft;
     state.btnStartTop = aiButton.offsetTop;
+    aiButton.setPointerCapture(event.pointerId);
     event.preventDefault();
   });
 
-  resizeCorner.addEventListener("mousedown", (event) => {
+  resizeCorner.addEventListener("pointerdown", (event) => {
     state.isResizing = true;
     const rect = chatbox.getBoundingClientRect();
     state.resizeAnchorX =
       state.resizeCornerHorizontal === "left" ? rect.right : rect.left;
     state.resizeAnchorY =
       state.resizeCornerVertical === "top" ? rect.bottom : rect.top;
+    resizeCorner.setPointerCapture(event.pointerId);
     event.preventDefault();
     event.stopPropagation();
   });
 
-  document.addEventListener("mousemove", (event) => {
+  document.addEventListener("pointermove", (event) => {
     if (!state.isDragging) {
       return;
     }
 
     const dx = event.clientX - state.dragStartX;
     const dy = event.clientY - state.dragStartY;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+    const threshold = event.pointerType === "mouse" ? 4 : 8;
+    if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
       state.dragMoved = true;
     }
     if (state.dragMoved) {
@@ -73,7 +76,7 @@ export function bindDragEvents({
     }
   });
 
-  document.addEventListener("mousemove", (event) => {
+  document.addEventListener("pointermove", (event) => {
     if (!state.isResizing) {
       return;
     }
@@ -134,7 +137,7 @@ export function bindDragEvents({
     chatbox.style.top = `${newTop}px`;
   });
 
-  document.addEventListener("mouseup", () => {
+  document.addEventListener("pointerup", () => {
     if (!state.isDragging) {
       return;
     }
@@ -153,7 +156,7 @@ export function bindDragEvents({
     chat.toggle();
   });
 
-  document.addEventListener("mouseup", () => {
+  document.addEventListener("pointerup", () => {
     if (!state.isResizing) {
       return;
     }
