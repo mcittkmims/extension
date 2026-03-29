@@ -98,4 +98,5 @@ export interface OverlayState {
   btnStartTop: number;
   isResizing: boolean;
   viewportNormalizeTimer: number | null;
+  isMobile: boolean;
 }
