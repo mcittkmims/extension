@@ -20,6 +20,7 @@ export function createOverlayState(): OverlayState {
     btnStartLeft: 0,
     btnStartTop: 0,
     isResizing: false,
-    viewportNormalizeTimer: null
+    viewportNormalizeTimer: null,
+    isMobile: false
   };
 }

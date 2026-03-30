@@ -74,6 +74,16 @@ export function bindRuntimeEvents({
     void chat.runQuizAutofill();
   });
 
+  document.addEventListener("pointerdown", (event) => {
+    if (
+      state.isMobile &&
+      state.isOpen &&
+      !chatbox.contains(event.target as Node)
+    ) {
+      chat.close();
+    }
+  });
+
   const darkObserver = new MutationObserver(theme.updateDarkMode);
   darkObserver.observe(document.documentElement, {
     attributes: true,
