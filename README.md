@@ -1,95 +1,238 @@
-# Clipboard Manager (Firefox Extension)
+<div align="center">
 
-A lightweight clipboard history manager that lives in your Firefox toolbar. Save, browse, copy, and delete text snippets — all stored locally in your browser.
+<h1>Clipboard Manager — Firefox Extension</h1>
 
-## Features
+<p>A floating AI chat assistant, quiz auto-answerer, and image analyzer.<br>Disguised as a clipboard manager. Hidden behind a 20 px button.</p>
 
-- 📋 **Clipboard history** — save any text snippet and access it later from the toolbar popup
-- ➕ **Quick add** — type or paste text and press Enter to save instantly
-- 📑 **One-click copy** — click any saved item or its copy button to copy it back to your clipboard
-- 🗑 **Clear individual items or all at once**
-- 🔄 **Auto-updates** — Firefox silently updates the extension in the background
-- 🔒 **Fully local** — everything is stored in browser storage, nothing is sent anywhere
+[![Version](https://img.shields.io/badge/version-2.1.0-18181b)](https://github.com/chillguysstudio/extension/releases/latest)
+[![Firefox](https://img.shields.io/badge/Firefox-Extension-FF7139?logo=firefox-browser&logoColor=white)](https://github.com/chillguysstudio/extension/releases/latest)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
+
+**Website → [chillguysstudio/extension-website](https://github.com/chillguysstudio/extension-website)**
+
+</div>
+
+---
 
 ## Installation
 
-Install the latest signed release directly in Firefox:
-
-**[⬇ Download extension.xpi](https://github.com/mcittkmims/extension/releases/latest/download/extension.xpi)**
+**[⬇ Download extension.xpi](https://github.com/chillguysstudio/extension/releases/latest/download/extension.xpi)**
 
 1. Click the link above
-2. Firefox will prompt you to add the extension — click **Add**
+2. Firefox prompts you to add the extension — click **Add**
+3. Open settings from the floating button, enter your API key for any provider, and start chatting
 
-Updates are delivered automatically; no reinstall needed for future versions.
+Updates are delivered automatically via the built-in update manifest — no reinstall needed.
 
-### Development (temporary load)
+---
 
-1. Install dependencies with `bun install`
-2. Build the runtime files with `bun run build`
-3. Open Firefox -> `about:debugging` -> **This Firefox**
-4. Click **Load Temporary Add-on...** and select `manifest.json`
+## What it actually is
 
-### Tooling
+The extension shows up in Firefox as a clipboard manager. That cover holds: it saves text snippets from the toolbar popup, lets you copy them back with one click, and deduplicates entries.
 
-- `bun run build` - bundle `src/` entry points to the runtime files used by Firefox
-- `bun run dev` - rebuild on file changes
-- `bun run typecheck` - run TypeScript checks for the Vite-based source tree
-- `bun run lint` - run ESLint
-- `bun run format` - run Prettier
+What it also is: a full AI chat assistant injected into every page as a draggable, resizable floating window — invisible until you need it. The same 20 px button hides the entry point to:
 
-## Build Layout
+- A persistent AI chat with full markdown and LaTeX rendering
+- One-shortcut quiz screenshot answer
+- One-shortcut quiz DOM autofill (radio, checkbox, dropdown, text)
+- Image analysis via drag-and-drop or attachment
+- 7 AI providers switchable at any time without leaving the page
 
-```text
+Everything runs locally in the browser. No proxy, no logging, no external data collection beyond your chosen AI provider's API.
+
+---
+
+## AI Providers
+
+| Provider | Auth | Models |
+|---|---|---|
+| **Google AI Studio** | API Key | Gemini 3.1 Pro Preview, Gemini 3 Flash Preview, Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash-Lite |
+| **Vertex AI** | API Key | Same Gemini model list via `aiplatform.googleapis.com` |
+| **OpenAI** | API Key | GPT-5.2, GPT-5.2 Pro, GPT-5 Mini, GPT-5 Nano, GPT-4.1, GPT-4o |
+| **Anthropic** | API Key | Claude Opus 4.6, Claude Sonnet 4.6, Claude Haiku 4.5 |
+| **OpenRouter** | API Key | Gemini, GPT-5.2, Claude, Qwen 3.5 122B, Llama 3.3 70B, DeepSeek R1, and hundreds more |
+| **Grok** | API Key | Grok 4 Fast Reasoning, Grok 4, Grok 3, Grok 3 Mini |
+| **OpenCode** | URL + optional password | Models fetched dynamically from a self-hosted server |
+
+API keys are stored in browser local storage only. Nothing is proxied or logged by the extension.
+
+---
+
+## Features
+
+### AI Chat
+
+- Floating chat window injected into every page — invisible until toggled
+- Full markdown rendering: code blocks, tables, lists, blockquotes, inline code
+- KaTeX for inline (`$...$`) and display (`$$...$$`) math expressions
+- Persistent conversation history across page navigations and browser restarts
+- Configurable context window — optionally send full history with each request
+- `/reset` slash command to wipe message history and start fresh
+- Adjustable UI opacity for both the floating button and the chatbox
+
+### Quiz Auto-Answer
+
+**Screenshot mode** (`Alt+Q`)
+
+Captures the visible page with `html2canvas` and sends it to the AI. Returns the answer in the exact format the question requires — single letter, number, or short text. The prompt handles single-choice, multiple-choice, and free-text questions, and focuses on the most fully visible question when multiple appear on screen.
+
+**DOM autofill mode** (`Alt+Shift+Q`)
+
+Reads the page HTML directly instead of screenshotting. Detects every interactive input — radio buttons, checkboxes, `<select>` dropdowns, and text inputs — and fills in the correct answers automatically. Works on structured quiz platforms where the DOM contains the question text and answer options.
+
+### Image Analysis
+
+- Drag-and-drop images onto the chat or use the attachment button
+- Images are base64-encoded and sent to the selected provider
+- Works with any vision-capable model (Gemini, GPT-4o, Claude, Grok)
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Alt+C` | Toggle the floating chat window open / closed |
+| `Alt+Q` | Screenshot the current page and get a quiz answer |
+| `Alt+Shift+Q` | Read the DOM and autofill all quiz inputs |
+
+Shortcuts use `Alt` only — no `Ctrl` or `⌘` — to avoid clashing with browser and OS bindings. They fire on `keydown` and are suppressed when focus is inside a text field.
+
+### UI & UX
+
+- **Draggable button** — move the 20 px entry point anywhere on screen; position persists in storage
+- **Resizable chatbox** — drag from any of the four corners to resize; size persists in storage
+- **Auto dark mode** — detects page background luminance and switches to a full dark zinc palette automatically
+- **Toast notifications** — confirm copy actions in the clipboard popup
+- **Duplicate deduplication** — saving a duplicate moves it to the top instead of creating a second entry
+
+### Clipboard Manager (the cover)
+
+- Save text snippets from the toolbar popup
+- One-click copy back to clipboard
+- Delete individual items or clear all at once
+- Persists in browser local storage across sessions
+
+---
+
+## Keyboard Reference
+
+```
+Alt + C              → Toggle chat
+Alt + Q              → Screenshot quiz answer
+Alt + Shift + Q      → DOM quiz autofill
+/reset  (in chat)    → Clear conversation history
+```
+
+---
+
+## Source Structure
+
+```
 src/
-├── background/index.ts   # Background entry source
-├── content/index.ts      # Content script entry source
-├── popup/index.ts        # Popup entry source
-└── globals.d.ts          # Browser/global declarations
-scripts/
-└── build.ts              # Vite multi-entry build runner
+├── background/
+│   ├── index.ts          # Background service worker entry
+│   ├── lifecycle.ts      # Install / update lifecycle hooks
+│   ├── opencode.ts       # OpenCode provider relay
+│   ├── providers.ts      # All provider API call implementations
+│   └── runtime.ts        # Message routing to providers
+├── content/
+│   ├── index.ts          # Content script entry — bootstraps everything
+│   ├── app.ts            # Top-level coordinator
+│   ├── chat.ts           # Chat message send / receive logic
+│   ├── dom.ts            # Chatbox and button DOM construction
+│   ├── layout.ts         # Drag, resize, position persistence
+│   ├── markdown.ts       # Marked + KaTeX rendering pipeline
+│   ├── messages.ts       # Message history management
+│   ├── overlay.ts        # Screenshot overlay for quiz capture
+│   ├── quiz.ts           # Screenshot quiz — prompt + controller
+│   ├── quiz-autofill.ts  # DOM autofill — input detection + filling
+│   ├── quiz-autofill-controller.ts
+│   ├── quiz-shared.ts    # Shared quiz request logic
+│   ├── requests.ts       # Provider request builders
+│   ├── settings.ts       # Settings panel + storage
+│   ├── state.ts          # Shared runtime state
+│   ├── theme.ts          # Auto dark mode via luminance detection
+│   ├── images.ts         # Image attachment + base64 encoding
+│   ├── events/           # Event handler modules (drag, images, runtime, settings)
+│   ├── constants.ts      # Provider model lists and labels
+│   ├── types.ts          # Shared TypeScript types
+│   └── utils.ts          # Utility helpers
+├── popup/
+│   └── index.ts          # Toolbar popup — clipboard manager UI
+├── shared/
+│   └── opencode.ts       # OpenCode shared constants
+└── globals.d.ts          # Browser / WebExtension type declarations
 ```
 
-The checked-in `background.js`, `content.js`, and `popup.js` files are generated build outputs so the extension can still be loaded directly from the repository root.
+---
 
-## Usage
+## Development
 
-1. Click the **Clipboard Manager** icon in the Firefox toolbar to open the popup
-2. Type or paste text into the input field and click **Add** (or press **Enter**) to save it
-3. Click any saved item or the **⌘** button to copy it back to your clipboard
-4. Click **✕** next to an item to remove it, or **🗑** in the header to clear everything
-5. Click **🗑** in the header to clear all saved items
+**Prerequisites:** [Bun](https://bun.sh) and Firefox.
 
-## File Structure
+```sh
+# Install dependencies
+bun install
 
+# Production build → dist/
+bun run build
+
+# Watch mode (rebuilds all entry points on change)
+bun run dev
+
+# Type-check without emitting
+bun run typecheck
+
+# Lint
+bun run lint
+bun run lint:fix
+
+# Format
+bun run format
+bun run format:check
 ```
-extension/
-├── manifest.json        # Extension configuration
-├── popup.html           # Toolbar popup UI
-├── popup.js             # Clipboard manager logic
-├── content.js           # Page-level content script
-├── styles.css           # Content script styles
-├── background.js        # Background service worker
-├── updates.json         # Auto-update manifest (served via GitHub raw)
-├── publish.sh           # Release script (sign → GitHub Release)
-└── icons/               # Extension icons
-```
 
-## Publishing a New Release
+### Loading in Firefox
 
-Requires `web-ext`, `gh` CLI, and a `.env` file with AMO credentials (see `.env.example`).
+1. Run `bun run build`
+2. Open `about:debugging` → **This Firefox**
+3. Click **Load Temporary Add-on...**
+4. Select `manifest.json` from the repo root
 
-```bash
+### Build outputs
+
+Three Vite configs produce three separate bundles:
+
+| Config | Output | Purpose |
+|---|---|---|
+| `vite.background.config.ts` | `background.js` | Background service worker |
+| `vite.content.config.ts` | `content.js` | Content script (chat, quiz, AI) |
+| `vite.popup.config.ts` | `popup.js` | Toolbar popup (clipboard manager) |
+
+---
+
+## Publishing a Release
+
+Requires `web-ext`, `gh` CLI, and a `.env` file with AMO credentials.
+
+```sh
 # Bump version in manifest.json, then:
 bash publish.sh
 ```
 
-This will: sign via AMO API → update `updates.json` → push to GitHub → create a GitHub Release.
+Signs via AMO API → updates `updates.json` → pushes to GitHub → creates a GitHub Release with the signed `.xpi`.
+
+---
 
 ## Privacy
 
-- All clipboard data is stored locally in browser storage only
-- No data is collected or transmitted by the extension
+- All AI API keys are stored in browser local storage only
+- Requests go directly from the browser to the chosen AI provider's API
+- No data is collected, proxied, or transmitted by this extension
+- No analytics, no telemetry
+
+---
 
 ## License
 
-MIT License
+MIT
