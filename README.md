@@ -9,7 +9,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-**Website → [chillguysstudio/extension-website](https://github.com/chillguysstudio/extension_website)**
+**Website → [chillguysstudio/extension_website](https://github.com/chillguysstudio/extension_website)**
 
 </div>
 
