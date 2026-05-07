@@ -25,6 +25,7 @@ import { createOverlayController } from "./overlay";
 import { createThemeController } from "./theme";
 import type { PendingRequest } from "./types";
 import type { ContextMessage } from "./messages";
+import type { CaptureTabResponse } from "./types";
 
 const POSITION_STORAGE_KEY = "ai_btn_pos";
 const CHAT_HISTORY_STORAGE_KEY = "aiGlobalChatHistory";
@@ -123,21 +124,46 @@ export async function startContentApp(): Promise<void> {
 
   const captureTab = async () => {
     if (state.isMobile) {
+      const nativeCapture = (await browser.runtime.sendMessage({
+        type: "captureTab"
+      })) as CaptureTabResponse;
+
+      if (nativeCapture.success) {
+        console.log("Quick Notes: mobile native capture success");
+        return nativeCapture;
+      }
+
+      console.warn("Quick Notes: mobile native capture failed", nativeCapture.error);
+
       try {
+        console.log("Quick Notes: mobile html2canvas capture start", {
+          url: window.location.href,
+          width: window.innerWidth,
+          height: window.innerHeight
+        });
         const canvas = await html2canvas(document.body, {
           useCORS: true,
           logging: false
         });
         const dataUrl = canvas.toDataURL("image/png");
+        console.log("Quick Notes: mobile html2canvas capture success", {
+          canvasWidth: canvas.width,
+          canvasHeight: canvas.height,
+          bytes: dataUrl.length
+        });
         return {
           success: true,
           base64: dataUrl.replace(/^data:image\/png;base64,/, ""),
           mimeType: "image/png"
         };
-      } catch {
+      } catch (error) {
+        console.error("Quick Notes: mobile html2canvas capture failed", error);
         return {
           success: false,
-          error: "html2canvas capture failed."
+          error:
+            error instanceof Error
+              ? error.message
+              : "html2canvas capture failed."
         };
       }
     }
